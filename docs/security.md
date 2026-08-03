@@ -4,10 +4,12 @@
 
 This MVP has **no password, JWT, SMS OTP, PIN, or email verification**.
 Registering a farmer creates a database record; the frontend selects and
-remembers an active farmer ID client-side. Every API endpoint trusts a
-client-supplied `farmer_id`, checking only "does this field/event belong to
-this farmer ID" at the database layer — there is no credential check
-proving the caller actually is that farmer.
+remembers an active farmer ID client-side. API endpoints check that a
+referenced `farmer_id`/`field_id` **exists** (404 if not) — they do not
+check that the caller is entitled to act on it. `GET /api/fields?farmer_id=`
+filters by farmer, but `GET`/`PATCH`/`DELETE /api/fields/{field_id}` operate
+on any field id with no ownership check at all. There is no credential
+check proving the caller actually is that farmer.
 
 This is a deliberate scope decision for local development and controlled
 pilots. **It must not be exposed as a public-internet-facing service.** The
@@ -42,15 +44,24 @@ be read as a security control against an untrusted caller.
   only (timeouts, 429, 5xx) — never retried into different behavior, and
   never silently substituting fixture data for a failed live call.
 
-## Input validation (see also `docs/validation.md`)
+## Input validation (see also `docs/validation.md` and `docs/api.md`)
 
 - All request/response bodies are Pydantic v2 schemas.
-- Field polygons are validated server-side (well-formed GeoJSON Polygon,
-  closed ring, no self-intersection, vertex-count and area caps) before
-  persistence or use in any calculation — planned for Phase 2 alongside the
-  `Field` model.
-- Structured error responses (`app/core/errors.py`) avoid leaking stack
-  traces or internal details to clients.
+- Field polygons are validated server-side (`app/domain/geo.py`):
+  well-formed GeoJSON `Polygon` only, closed rings, coordinate range checks,
+  no self-intersection (Shapely `is_valid`), vertex-count and area caps
+  (`MAX_POLYGON_VERTICES`/`MAX_FIELD_AREA_HECTARES`) — before persistence or
+  use in any calculation. Area/centroid are always server-recomputed, never
+  accepted from the client.
+- Structured error responses (`app/core/errors.py`) cover three cases
+  uniformly: domain errors (`AppError` → its own status code, e.g. 404/409/
+  422), request schema validation (`RequestValidationError` → 422), and any
+  other unhandled exception (→ 500, logged server-side, no stack trace or
+  internal detail in the response body).
+- A unique-constraint violation (e.g. duplicate farmer phone) is caught at
+  the service layer, the transaction is rolled back, and a `409` with a
+  clear `code` is returned — the database session stays usable for
+  subsequent requests rather than being left in a broken state.
 
 ## What's intentionally deferred
 

@@ -32,18 +32,21 @@ full calculation methodology and its version history.
 
 ## Current status
 
-Foundational scaffolding stage. Core domain models, the water-balance engine,
-and live provider integrations are not implemented yet — see the repository's
-implementation plan for the phased roadmap. `main` only carries this secure
-foundation; all application work happens on feature branches and lands via
-pull request.
+Farmer/Field/IrrigationEvent CRUD is implemented and tested (Phase 2), with
+server-side GeoJSON polygon validation and area/centroid calculation — see
+`docs/api.md`. The water-balance engine, recommendation engine, confidence
+calculations, and live provider integrations are not implemented yet — see
+the repository's implementation plan for the phased roadmap. `main` only
+carries the secure foundation; all application work happens on feature
+branches and lands via pull request.
 
 ## Security posture — read before running anywhere but your own machine
 
 **This MVP has no authentication.** Registering a farmer creates a database
 record; the frontend simply selects/remembers an active farmer ID in the
-browser. There is no login, no password, and no per-user access control
-beyond "does this field belong to this farmer ID" at the database level.
+browser. There is no login, no password, and no per-user access control —
+API endpoints check that a referenced farmer/field *exists*, not that the
+caller is entitled to act on it. See `docs/security.md` for the exact scope.
 
 This is intentional for local development and controlled pilots, and
 **unsuitable for public/production deployment** until a real authentication
@@ -71,6 +74,7 @@ python -m venv .venv
 .venv\Scripts\activate      # Windows
 pip install -e ".[dev]"
 copy ..\.env.example ..\.env   # then edit if needed; DATA_MODE=fixture works with no further changes
+alembic upgrade head           # creates the SQLite schema (farmers/fields/irrigation_events/analyses)
 uvicorn app.main:app --reload
 ```
 
@@ -87,7 +91,8 @@ npm run dev
 ```
 backend/    FastAPI app, domain logic, providers, config (YAML), tests
 frontend/   React + TypeScript + Vite SPA
-docs/       Methodology, data-mode contract, future PostGIS migration notes
+docs/       Architecture, API reference, methodology, security, validation,
+            data-mode contract, future PostGIS migration notes
 ```
 
 See `CLAUDE.md` for conventions this repository expects an AI coding

@@ -1,8 +1,8 @@
 # Validation rules
 
-Status: Phase 1 foundation document. The `Field`/`IrrigationEvent` models
-and their API-boundary validation land in Phase 2; this records the rules
-they must implement so the contract is decided ahead of the code.
+Status: Phase 2 complete. The `Farmer`/`Field`/`IrrigationEvent` models and
+their API-boundary validation are implemented and tested; see `docs/api.md`
+for the endpoint-level contract.
 
 ## Configuration validation (implemented, Phase 1)
 
@@ -13,23 +13,39 @@ immediately — the application fails to start rather than serving requests
 against partially-loaded or guessed agronomic values. Covered by
 `backend/tests/unit/test_config_loader.py`.
 
-## Field polygon validation (planned, Phase 2)
+## Field polygon validation (implemented — `app/domain/geo.py`)
 
-Before persistence or use in any calculation, a submitted GeoJSON `Polygon`
-must:
+Before persistence or use in any calculation, a submitted GeoJSON geometry
+must (see `docs/api.md` for the full rule list and status codes):
 
-- Be well-formed GeoJSON (correct type, closed linear ring(s)).
+- Be `"type": "Polygon"` — not `Point`, `LineString`, `MultiPolygon`, etc.
+- Have every ring (exterior + holes) well-formed: at least 4 positions,
+  closed (first == last position), each position a numeric
+  `[longitude, latitude]` pair within range.
 - Pass a geometric validity check (no self-intersection) via Shapely
-  `is_valid`.
-- Stay within a configured maximum vertex count.
-- Stay within a configured maximum area — rejecting implausibly large
-  polygons rather than silently accepting them.
+  `is_valid`, and be non-empty.
+- Stay within a configured maximum vertex count (`MAX_POLYGON_VERTICES`).
+- Stay within a configured maximum area (`MAX_FIELD_AREA_HECTARES`) —
+  rejecting implausibly large polygons rather than silently accepting them.
 - Use WGS84 coordinates (EPSG:4326), consistent with GeoJSON's default CRS.
 
 Area and centroid are computed server-side from the validated polygon using
 `pyproj`'s geodesic calculation (`Geod.geometry_area_perimeter`) — never
 trusted from the client, and correct independent of the SQLite/PostgreSQL
-storage backend (see `docs/postgis_migration.md`).
+storage backend (see `docs/postgis_migration.md`). The stored geometry is
+normalized (coordinates rounded to 7 decimal places) rather than the raw
+client payload. Covered by `backend/tests/unit/test_geo_validation.py` and
+the field-creation/-update tests in `backend/tests/api/`.
+
+## Model-level validation (implemented — `app/db/models/`)
+
+CHECK constraints enforce the same invariants at the database layer as a
+defense-in-depth measure, independent of the application code above:
+`area_hectares > 0`, centroid within valid lat/lon ranges,
+`expected_harvest_date > planting_date`, override values within their
+documented ranges (root depth, field capacity, wilting point), and
+non-negative irrigation amounts/rates. `Farmer.phone` is unique. Covered by
+`backend/tests/unit/test_models.py`.
 
 ## API-boundary validation (ongoing)
 

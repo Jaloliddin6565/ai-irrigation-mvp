@@ -35,19 +35,22 @@ dvigateli qo'shilgandan so'ng `docs/methodology.md` faylida bo'ladi.
 
 ## Joriy holat
 
-Loyiha asos (foundation) bosqichida. Asosiy domen modellari, suv balansi
-dvigateli va jonli (live) provayder integratsiyalari hali amalga
-oshirilmagan. `main` shoxobchasi faqat mana shu xavfsiz asosni saqlaydi;
-barcha ilova ishlari feature-shoxobchalarida olib boriladi va pull request
-orqali qo'shiladi.
+Fermer/Dala/Sug'orish hodisasi uchun CRUD amalga oshirilgan va sinovdan
+o'tkazilgan (2-bosqich), shu jumladan server tomonida GeoJSON poligon
+validatsiyasi va maydon/markaz hisob-kitobi — qarang `docs/api.md`. Suv
+balansi dvigateli, tavsiya dvigateli, ishonch hisob-kitoblari va jonli
+(live) provayder integratsiyalari hali amalga oshirilmagan. `main`
+shoxobchasi faqat xavfsiz asosni saqlaydi; barcha ilova ishlari
+feature-shoxobchalarida olib boriladi va pull request orqali qo'shiladi.
 
 ## Xavfsizlik holati — boshqa mashinada ishga tushirishdan oldin o'qing
 
 **Bu MVPda autentifikatsiya yo'q.** Fermerni ro'yxatdan o'tkazish faqat
 ma'lumotlar bazasida yozuv yaratadi; frontend brauzerda faol fermer ID'sini
-tanlaydi/eslab qoladi. Kirish (login), parol yoki "bu dala shu fermerga
-tegishlimi" degan ma'lumotlar bazasi darajasidagi tekshiruvdan tashqari
-foydalanuvchi darajasidagi kirish nazorati yo'q.
+tanlaydi/eslab qoladi. Foydalanuvchi darajasidagi kirish nazorati yo'q — API
+so'rovlari faqat ko'rsatilgan fermer/dala *mavjudligini* tekshiradi, so'rov
+yuboruvchining unga haqli ekanligini emas. Aniq chegaralar uchun
+`docs/security.md` fayliga qarang.
 
 Bu qasddan qilingan qaror — mahalliy ishlab chiqish va nazorat qilinadigan
 pilot loyihalar uchun, ammo **ommaviy/production muhitda ishlatish uchun
