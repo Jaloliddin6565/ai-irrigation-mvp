@@ -63,9 +63,14 @@ and phased roadmap context.
 
 ## Where things go
 
-- `backend/app/domain/` — pure business logic (water balance, recommendation,
-  confidence, crop stage, geo/polygon math). No I/O, no framework imports,
-  fully unit-testable, no randomness.
+- `backend/app/domain/` — pure business logic (crop_stage, water_balance,
+  initialization, irrigation_normalization, satellite_adjustment,
+  recommendation, confidence, geo/polygon math). No I/O, no framework
+  imports, fully unit-testable, no randomness. Two independent version
+  numbers exist on purpose: `ANALYSIS_METHODOLOGY_VERSION`
+  (`app/services/analysis.py`) versions this *calculation code*; each YAML
+  file's own `methodology_version` versions the *agronomic values* fed
+  into it. Don't conflate them when bumping one or the other.
 - `backend/app/providers/` — the only place external I/O (CDSE, Open-Meteo)
   happens, behind `SatelliteProvider`/`WeatherProvider` interfaces with
   fixture and live implementations.

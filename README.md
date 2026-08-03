@@ -27,18 +27,19 @@ trained AI model.
 > bevosita o'lchamaydi va agronom yoki suv xo'jaligi mutaxassisi xulosasini
 > to'liq almashtirmaydi."
 
-See `docs/methodology.md` (added as the water-balance engine lands) for the
-full calculation methodology and its version history.
+See `docs/methodology.md` for the full calculation methodology, units, and
+version history.
 
 ## Current status
 
-Farmer/Field/IrrigationEvent CRUD is implemented and tested (Phase 2), with
-server-side GeoJSON polygon validation and area/centroid calculation — see
-`docs/api.md`. The water-balance engine, recommendation engine, confidence
-calculations, and live provider integrations are not implemented yet — see
-the repository's implementation plan for the phased roadmap. `main` only
-carries the secure foundation; all application work happens on feature
-branches and lands via pull request.
+The full deterministic analysis pipeline is implemented and tested (Phase
+3): crop-stage determination, daily water balance with an explicit
+initialization strategy, conservative satellite qualification, and a
+range-based irrigation recommendation with an explainable confidence
+score — see `docs/methodology.md` and `docs/api.md`. Everything currently
+runs against deterministic fixture data only; live Sentinel-2/Open-Meteo
+integration is Phase 4. `main` only carries the secure foundation; all
+application work happens on feature branches and lands via pull request.
 
 ## Security posture — read before running anywhere but your own machine
 

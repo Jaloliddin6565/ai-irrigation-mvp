@@ -30,18 +30,21 @@ o'qitilgan AI modeli emas.
 > bevosita o'lchamaydi va agronom yoki suv xo'jaligi mutaxassisi xulosasini
 > to'liq almashtirmaydi."
 
-To'liq hisoblash metodologiyasi va uning versiyalar tarixi suv balansi
-dvigateli qo'shilgandan so'ng `docs/methodology.md` faylida bo'ladi.
+To'liq hisoblash metodologiyasi, o'lchov birliklari va versiyalar tarixi
+`docs/methodology.md` faylida keltirilgan.
 
 ## Joriy holat
 
-Fermer/Dala/Sug'orish hodisasi uchun CRUD amalga oshirilgan va sinovdan
-o'tkazilgan (2-bosqich), shu jumladan server tomonida GeoJSON poligon
-validatsiyasi va maydon/markaz hisob-kitobi — qarang `docs/api.md`. Suv
-balansi dvigateli, tavsiya dvigateli, ishonch hisob-kitoblari va jonli
-(live) provayder integratsiyalari hali amalga oshirilmagan. `main`
-shoxobchasi faqat xavfsiz asosni saqlaydi; barcha ilova ishlari
-feature-shoxobchalarida olib boriladi va pull request orqali qo'shiladi.
+To'liq deterministik tahlil zanjiri amalga oshirilgan va sinovdan
+o'tkazilgan (3-bosqich): ekin bosqichini aniqlash, aniq boshlang'ich
+holatga ega kunlik suv balansi, ehtiyotkorlik bilan sun'iy yo'ldosh
+tuzatishi va tushuntirilgan ishonch darajasiga ega oraliq ko'rinishidagi
+sug'orish tavsiyasi — qarang `docs/methodology.md` va `docs/api.md`.
+Hozircha barchasi faqat deterministik namunaviy (fixture) ma'lumotlar bilan
+ishlaydi; jonli (live) Sentinel-2/Open-Meteo integratsiyasi 4-bosqichda
+amalga oshiriladi. `main` shoxobchasi faqat xavfsiz asosni saqlaydi; barcha
+ilova ishlari feature-shoxobchalarida olib boriladi va pull request orqali
+qo'shiladi.
 
 ## Xavfsizlik holati — boshqa mashinada ishga tushirishdan oldin o'qing
 

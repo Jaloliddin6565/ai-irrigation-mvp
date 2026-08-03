@@ -8,8 +8,10 @@ remembers an active farmer ID client-side. API endpoints check that a
 referenced `farmer_id`/`field_id` **exists** (404 if not) — they do not
 check that the caller is entitled to act on it. `GET /api/fields?farmer_id=`
 filters by farmer, but `GET`/`PATCH`/`DELETE /api/fields/{field_id}` operate
-on any field id with no ownership check at all. There is no credential
-check proving the caller actually is that farmer.
+on any field id with no ownership check at all. `POST /api/fields/{field_id}/analyze`
+and its `GET` counterparts follow the same pattern (existence-checked, not
+ownership-checked). There is no credential check proving the caller
+actually is that farmer.
 
 This is a deliberate scope decision for local development and controlled
 pilots. **It must not be exposed as a public-internet-facing service.** The

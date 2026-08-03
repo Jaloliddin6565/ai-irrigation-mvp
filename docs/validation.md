@@ -1,8 +1,13 @@
 # Validation rules
 
-Status: Phase 2 complete. The `Farmer`/`Field`/`IrrigationEvent` models and
-their API-boundary validation are implemented and tested; see `docs/api.md`
-for the endpoint-level contract.
+Status: Phase 3 complete. `Farmer`/`Field`/`IrrigationEvent` CRUD validation
+(Phase 2) plus the analysis engine's input/calculation validation (Phase 3)
+are implemented and tested; see `docs/api.md` for the endpoint-level
+contract and `docs/methodology.md` for the calculations these rules feed.
+
+(This file covers the same ground the plan referred to as
+"docs/validation-plan.md" — kept as `docs/validation.md`, the file that
+already existed, rather than creating a second, overlapping document.)
 
 ## Configuration validation (implemented, Phase 1)
 
@@ -58,6 +63,30 @@ non-negative irrigation amounts/rates. `Farmer.phone` is unique. Covered by
 - Structured error responses (`app/core/errors.py::ErrorResponse`) carry a
   stable `code`, an Uzbek message, an optional English message, and
   optional structured `details` — never a raw stack trace.
+
+## Analysis engine validation (implemented — `app/domain/`)
+
+- `compute_etc`/`compute_effective_precipitation`/`compute_effective_irrigation`
+  reject negative ET0/precipitation/irrigation inputs immediately
+  (`ValueError`) rather than silently clamping or ignoring them.
+- `compute_taw` requires `field_capacity > wilting_point` and
+  `root_depth_m > 0`; `compute_raw` requires `depletion_fraction` in
+  `(0, 1]`. Malformed config or a bad override would fail loudly here
+  rather than producing a nonsensical TAW/RAW.
+- The satellite adjustment requires **at least 2** valid (fresh,
+  high-quality) observations before doing anything; one observation,
+  however extreme, never moves the estimate (`test_satellite_adjustment.py`).
+- The recommendation engine requires `taw_mm > 0` and `raw_mm > 0` whenever
+  a depletion value is present, and always returns a range
+  (`recommended_max_mm > recommended_min_mm`) rather than a single value
+  when irrigation is recommended.
+- `determine_initialization` never fabricates a starting depletion: it
+  either grounds it in a real anchor (irrigation event or planting date,
+  rolled forward through real weather) or returns `insufficient_data`
+  explicitly (`test_initialization.py`).
+- A malformed `analysis_date` in `POST /analyze` (e.g. not a valid ISO
+  date) is rejected with `422 validation_error` by the Pydantic request
+  schema before any engine code runs.
 
 ## Determinism as a validation concern
 
