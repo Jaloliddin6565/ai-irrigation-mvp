@@ -1,0 +1,39 @@
+# Recommendation-engine thresholds — GENERIC PLACEHOLDER VALUES.
+# See docs/methodology.md for how these feed into the recommendation status
+# and mm/m3 ranges. Nothing here is Uzbekistan-calibrated.
+
+methodology_version: "0.2.0"
+
+# Status is primarily driven by depletion as a fraction of RAW (readily
+# available water) and TAW (total available water):
+#   depletion/RAW <  monitor_depletion_raw_ratio          -> no_irrigation_needed
+#   depletion/RAW >= monitor_depletion_raw_ratio           -> monitor
+#   depletion/RAW >= irrigate_soon_depletion_raw_ratio     -> irrigate_soon
+#   depletion/RAW >= irrigate_now_depletion_raw_ratio      -> irrigate_now
+# (irrigate_now_depletion_raw_ratio is normally 1.0: RAW exhausted, into the
+# stress-risk portion of TAW.)
+status_thresholds:
+  monitor_depletion_raw_ratio: 0.5
+  irrigate_soon_depletion_raw_ratio: 0.8
+  irrigate_now_depletion_raw_ratio: 1.0
+
+# If forecast precipitation over the coming window meets/exceeds the
+# threshold, an otherwise irrigate_soon/irrigate_now result is downgraded to
+# delay_due_to_forecast_rain instead.
+forecast_rain:
+  window_hours: 60
+  delay_threshold_mm: 10.0
+
+# The recommended mm range brackets the estimated depletion (the amount of
+# water needed to bring the root zone back toward field capacity), scaled
+# by irrigation efficiency so the range reflects what to APPLY (not what the
+# crop will actually receive), then clamped to the crop's practical
+# application limits.
+recommended_range:
+  min_replacement_fraction: 0.8
+  max_replacement_fraction: 1.15
+
+# Extra +/- padding applied to the range width when confidence is not high,
+# as a fraction of the base range — a low-confidence result should look
+# less falsely precise than a high-confidence one.
+uncertainty_range_padding_fraction: 0.15
