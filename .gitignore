@@ -1,0 +1,45 @@
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# --- Databases ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/build/
+.vite/
+coverage/
+
+# --- Docker ---
+*.override.yml
+
+# --- Logs ---
+*.log
+logs/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
