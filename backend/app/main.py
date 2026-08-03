@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import config_options, farmers, fields, health, irrigations
+from app.api import analyses, config_options, farmers, fields, health, irrigations
 from app.core.errors import (
     AppError,
     app_error_handler,
@@ -42,3 +42,4 @@ app.include_router(config_options.router)
 app.include_router(farmers.router)
 app.include_router(fields.router)
 app.include_router(irrigations.router)
+app.include_router(analyses.router)
