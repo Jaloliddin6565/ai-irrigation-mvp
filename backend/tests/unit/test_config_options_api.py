@@ -22,4 +22,4 @@ def test_config_options_lists_expected_enums(client: TestClient) -> None:
         "basin",
         "unknown",
     }
-    assert body["methodology_version"] == "0.1.0"
+    assert body["methodology_version"] == "0.2.0"
