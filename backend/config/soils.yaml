@@ -2,50 +2,56 @@
 #
 # field_capacity / wilting_point are volumetric water content fractions
 # (m3/m3), representative textbook ranges for each texture class, NOT
-# derived from Uzbekistan soil surveys. depletion_fraction is the FAO-56
-# "p" default fraction of TAW assumed readily available before stress;
-# actual p is also crop-dependent (see docs/methodology.md).
+# derived from Uzbekistan soil surveys. depletion_fraction (FAO-56 "p") now
+# lives on the crop profile (backend/config/crops.yaml), not here — see the
+# comment there.
 #
-# "unknown" is a deliberately conservative middle-of-the-road profile used
-# when a farmer has not specified soil texture — it lowers confidence
-# rather than guessing a specific texture.
+# uncertainty_factor is on the same 0.0 (well-established local value) to
+# 1.0 (generic placeholder) scale used in crops.yaml, feeding the confidence
+# engine's soil_profile_quality factor.
+#
+# "unknown" is the deliberately conservative default profile used when a
+# farmer has not specified soil texture: field_capacity/wilting_point sit
+# in the middle of the other textures' ranges rather than guessing a
+# specific one, uncertainty_factor is at its maximum (1.0), and
+# requires_field_survey flags it for the confidence engine and the UI.
 
-methodology_version: "0.1.0"
+methodology_version: "0.2.0"
 
 soils:
   sand:
     label_uz: "Qumloq"
     field_capacity: 0.12
     wilting_point: 0.05
-    depletion_fraction: 0.55
+    uncertainty_factor: 0.7
 
   sandy_loam:
     label_uz: "Qumoq tuproq"
     field_capacity: 0.18
     wilting_point: 0.08
-    depletion_fraction: 0.50
+    uncertainty_factor: 0.7
 
   loam:
     label_uz: "O'rtacha tuproq (qumoq-soz)"
     field_capacity: 0.28
     wilting_point: 0.14
-    depletion_fraction: 0.50
+    uncertainty_factor: 0.7
 
   clay_loam:
     label_uz: "Og'ir qumoq-soz tuproq"
     field_capacity: 0.32
     wilting_point: 0.20
-    depletion_fraction: 0.45
+    uncertainty_factor: 0.7
 
   clay:
     label_uz: "Soz tuproq"
     field_capacity: 0.38
     wilting_point: 0.24
-    depletion_fraction: 0.40
+    uncertainty_factor: 0.7
 
   unknown:
     label_uz: "Noma'lum"
     field_capacity: 0.25
     wilting_point: 0.12
-    depletion_fraction: 0.45
+    uncertainty_factor: 1.0
     requires_field_survey: true

@@ -1,29 +1,49 @@
 # Water-balance engine defaults — GENERIC PLACEHOLDER VALUES.
 # See docs/methodology.md for the full equations these feed into.
 
-methodology_version: "0.1.0"
+methodology_version: "0.2.0"
 
 effective_precipitation_factor: 0.8
 
 satellite:
   lookback_days: 90
   min_valid_observations_for_trend: 2
+  # An observation older than this (relative to analysis_date) is treated as
+  # stale and excluded from the trend adjustment (but still lowers
+  # confidence via satellite_freshness).
+  max_observation_age_days_for_trend: 20
+  # An observation with a lower valid-pixel ratio than this is treated as
+  # low-quality and excluded from the trend adjustment.
+  low_valid_pixel_ratio_threshold: 0.6
   trend_adjustment_cap_fraction_of_raw: 0.15
 
-initial_depletion:
+initialization:
   # Order of preference when initializing the daily water balance for a
-  # field with no prior Analysis history:
-  #   1. recent_irrigation_lookback_days: if an IrrigationEvent exists within
-  #      this many days of the analysis start, assume near-field-capacity
-  #      (near-zero depletion) at that event's date and roll forward.
-  #   2. assume_field_capacity_at_planting: if planting_date is within the
-  #      lookback window, assume near-field-capacity at planting.
-  #   3. conservative_default_fraction_of_raw: otherwise, initialize
-  #      depletion at this fraction of RAW (a middle-ground assumption,
-  #      neither "just irrigated" nor "critically dry").
-  #   4. if none of the above apply and there isn't enough weather/satellite
-  #      history to bridge the gap either, the engine must return
-  #      insufficient_data rather than guess further.
-  recent_irrigation_lookback_days: 5
-  assume_field_capacity_at_planting: true
+  # field with no prior Analysis history — see docs/methodology.md for the
+  # full explanation of each tier:
+  #   1. A known-amount IrrigationEvent within max_anchor_age_days of
+  #      analysis_date: assume the field was fully depleted (worst case,
+  #      TAW) immediately before that irrigation, apply the known effective
+  #      amount, then roll forward day-by-day through real weather (and any
+  #      further recorded irrigation) to analysis_date.
+  #   2. Same as (1) but the amount is derived from duration+flow_rate
+  #      rather than a directly stated amount/volume (lower confidence, same
+  #      math).
+  #   3. If planting_date falls within max_anchor_age_days: assume
+  #      near-field-capacity (zero depletion) at planting and roll forward.
+  #   4. Otherwise, initialize at conservative_default_fraction_of_raw of
+  #      RAW at the earliest date the available weather history covers, and
+  #      roll forward from there (reduced confidence).
+  #   5. If even the weather history is too short to roll forward at all,
+  #      return insufficient_data rather than guess further.
+  max_anchor_age_days: 90
   conservative_default_fraction_of_raw: 0.5
+
+# Conservative estimated depths (mm) used ONLY when a farmer records an
+# irrigation event with qualitative_amount and no quantitative value at all.
+# These are deliberately rough and always flagged as a farmer estimate with
+# reduced confidence — see app/domain/irrigation_normalization.py.
+qualitative_irrigation_mm:
+  little: 8.0
+  moderate: 18.0
+  a_lot: 35.0

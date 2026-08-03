@@ -5,7 +5,7 @@
 # Representative textbook ranges, not measured for local infrastructure
 # condition. "unknown" uses a conservative middle default.
 
-methodology_version: "0.1.0"
+methodology_version: "0.2.0"
 
 irrigation_methods:
   drip:

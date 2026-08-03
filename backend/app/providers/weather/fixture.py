@@ -7,7 +7,7 @@ dependence.
 """
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
 
@@ -33,3 +33,43 @@ class FixtureWeatherProvider:
         series = self._load()
         filtered = [d for d in series.days if start_date <= d.date <= end_date]
         return WeatherSeries(timezone=series.timezone, days=filtered)
+
+    def get_daily_series_for_range(
+        self, lat: float, lon: float, start_date: date, end_date: date, as_of: date
+    ) -> WeatherSeries:
+        """Like get_daily_series, but cycles the fixed demo season to cover
+        ANY requested [start_date, end_date] instead of only the fixture's
+        own fixed 2024 calendar window.
+
+        This is what makes fixture mode usable for an analysis at a real
+        planting_date/analysis_date rather than only ones that happen to
+        fall inside the static file's date range. Still fully deterministic
+        (same request -> same output) and still DEMO/FIXTURE DATA — only
+        the calendar labels are remapped; the underlying values are the
+        same fixed, non-random season. is_forecast is recomputed relative
+        to `as_of`, not the fixture file's own historical/forecast split.
+        """
+        series = self._load()
+        pattern = series.days
+        if not pattern:
+            return WeatherSeries(timezone=series.timezone, days=[])
+
+        total_days = (end_date - start_date).days + 1
+        result_days = []
+        for i in range(total_days):
+            source = pattern[i % len(pattern)]
+            d = start_date + timedelta(days=i)
+            result_days.append(
+                DailyWeather(
+                    date=d,
+                    is_forecast=d > as_of,
+                    et0_mm=source.et0_mm,
+                    precipitation_mm=source.precipitation_mm,
+                    precipitation_probability_pct=source.precipitation_probability_pct,
+                    temperature_max_c=source.temperature_max_c,
+                    temperature_min_c=source.temperature_min_c,
+                    wind_speed_ms=source.wind_speed_ms,
+                    shortwave_radiation_mj_m2=source.shortwave_radiation_mj_m2,
+                )
+            )
+        return WeatherSeries(timezone=series.timezone, days=result_days)

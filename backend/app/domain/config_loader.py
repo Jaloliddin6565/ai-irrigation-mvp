@@ -1,10 +1,11 @@
 """Loads and validates the YAML agronomic configuration.
 
 Agronomic values (Kc curves, soil parameters, irrigation efficiencies,
-confidence weights) live in backend/config/*.yaml, never hardcoded in
-Python — see CLAUDE.md. This module is the single place that reads those
-files and validates them into typed, immutable Pydantic models, failing
-fast (at startup) on malformed config rather than at request time.
+water-balance/recommendation/confidence defaults) live in
+backend/config/*.yaml, never hardcoded in Python — see CLAUDE.md. This
+module is the single place that reads those files and validates them into
+typed, immutable Pydantic models, failing fast (at startup) on malformed
+config rather than at request time.
 """
 
 from functools import lru_cache
@@ -14,7 +15,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict
 
 
-class StageValues(BaseModel):
+class StageLengthsDays(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     initial: float
@@ -24,20 +25,33 @@ class StageValues(BaseModel):
 
 
 class CropKc(BaseModel):
+    """FAO-56 notation: Kc_ini, Kc_mid, Kc_end."""
+
     model_config = ConfigDict(frozen=True)
 
     initial: float
     mid: float
-    late: float
+    end: float
+
+
+class MinMax(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    min: float
+    max: float
 
 
 class CropProfile(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     label_uz: str
-    stage_lengths_days: StageValues
+    stage_lengths_days: StageLengthsDays
     kc: CropKc
-    root_depth_m: StageValues
+    root_depth_initial_m: float
+    root_depth_max_m: float
+    depletion_fraction: float
+    practical_application_mm: MinMax
+    uncertainty_factor: float
 
 
 class CropsConfig(BaseModel):
@@ -53,7 +67,7 @@ class SoilProfile(BaseModel):
     label_uz: str
     field_capacity: float
     wilting_point: float
-    depletion_fraction: float
+    uncertainty_factor: float
     requires_field_survey: bool = False
 
 
@@ -84,15 +98,24 @@ class SatelliteDefaults(BaseModel):
 
     lookback_days: int
     min_valid_observations_for_trend: int
+    max_observation_age_days_for_trend: int
+    low_valid_pixel_ratio_threshold: float
     trend_adjustment_cap_fraction_of_raw: float
 
 
-class InitialDepletionDefaults(BaseModel):
+class InitializationDefaults(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    recent_irrigation_lookback_days: int
-    assume_field_capacity_at_planting: bool
+    max_anchor_age_days: int
     conservative_default_fraction_of_raw: float
+
+
+class QualitativeIrrigationMm(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    little: float
+    moderate: float
+    a_lot: float
 
 
 class WaterBalanceDefaultsConfig(BaseModel):
@@ -101,7 +124,40 @@ class WaterBalanceDefaultsConfig(BaseModel):
     methodology_version: str
     effective_precipitation_factor: float
     satellite: SatelliteDefaults
-    initial_depletion: InitialDepletionDefaults
+    initialization: InitializationDefaults
+    qualitative_irrigation_mm: QualitativeIrrigationMm
+
+
+class RecommendationStatusThresholds(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    monitor_depletion_raw_ratio: float
+    irrigate_soon_depletion_raw_ratio: float
+    irrigate_now_depletion_raw_ratio: float
+
+
+class ForecastRainDefaults(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    window_hours: int
+    delay_threshold_mm: float
+
+
+class RecommendedRangeDefaults(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    min_replacement_fraction: float
+    max_replacement_fraction: float
+
+
+class RecommendationDefaultsConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    methodology_version: str
+    status_thresholds: RecommendationStatusThresholds
+    forecast_rain: ForecastRainDefaults
+    recommended_range: RecommendedRangeDefaults
+    uncertainty_range_padding_fraction: float
 
 
 class ConfidenceThresholds(BaseModel):
@@ -111,12 +167,23 @@ class ConfidenceThresholds(BaseModel):
     medium: float
 
 
+class ConfidenceCaps(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    max_score_if_irrigation_amount_unknown: float
+    max_score_if_soil_unknown: float
+    max_score_if_initialization_weak: float
+    max_score_if_satellite_stale_or_low_quality: float
+    max_score_if_weather_missing: float
+
+
 class ConfidenceWeightsConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     methodology_version: str
     weights: dict[str, float]
     thresholds: ConfidenceThresholds
+    caps: ConfidenceCaps
 
 
 class AgronomicConfig(BaseModel):
@@ -126,6 +193,7 @@ class AgronomicConfig(BaseModel):
     soils: SoilsConfig
     irrigation_methods: IrrigationMethodsConfig
     water_balance_defaults: WaterBalanceDefaultsConfig
+    recommendation_defaults: RecommendationDefaultsConfig
     confidence_weights: ConfidenceWeightsConfig
 
 
@@ -143,6 +211,9 @@ def load_agronomic_config(config_dir: Path) -> AgronomicConfig:
         ),
         water_balance_defaults=WaterBalanceDefaultsConfig.model_validate(
             _read_yaml(config_dir / "water_balance_defaults.yaml")
+        ),
+        recommendation_defaults=RecommendationDefaultsConfig.model_validate(
+            _read_yaml(config_dir / "recommendation_defaults.yaml")
         ),
         confidence_weights=ConfidenceWeightsConfig.model_validate(
             _read_yaml(config_dir / "confidence_weights.yaml")

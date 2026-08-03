@@ -1,17 +1,39 @@
 # Crop profiles — GENERIC FAO-56-STYLE PLACEHOLDER VALUES.
 #
-# These Kc curves, stage lengths, and root depths are representative
-# textbook values (FAO Irrigation and Drainage Paper 56, Annex 12 style),
-# NOT calibrated for Uzbekistan varieties, climate, or agronomic practice.
-# They MUST be validated against local field trials before being used to
-# drive real irrigation decisions. Every number here is a starting point,
-# not a fact.
+# These Kc curves, stage lengths, root depths, depletion fractions, and
+# practical application limits are representative textbook values (FAO
+# Irrigation and Drainage Paper 56, Annex 12 style), NOT calibrated for
+# Uzbekistan varieties, climate, or agronomic practice. They MUST be
+# validated against local field trials before being used to drive real
+# irrigation decisions. Every number here is a starting point, not a fact.
 #
-# Stages: initial -> development -> mid -> late (standard FAO-56 growth
-# staging). Kc values are linearly interpolated between stage midpoints by
-# app/domain/crop_stage.py.
+# Stages: initial -> development -> mid_season -> late_season (standard
+# FAO-56 growth staging), computed from planting_date + stage_lengths_days
+# by app/domain/crop_stage.py. kc.initial/mid/end follow FAO-56 notation
+# (Kc_ini, Kc_mid, Kc_end); Kc is held constant during initial and
+# mid_season, and linearly interpolated during development (initial->mid)
+# and late_season (mid->end). root_depth grows linearly from
+# root_depth_initial_m to root_depth_max_m over the development stage, then
+# holds at root_depth_max_m.
+#
+# depletion_fraction is FAO-56's "p" — the fraction of TAW assumed readily
+# available (RAW = p * TAW) before the crop experiences water stress. FAO-56
+# treats p as primarily crop-dependent (with an ETc-rate adjustment this MVP
+# does not implement), so it lives here rather than on the soil profile.
+#
+# practical_application_mm.min/max bound the recommended irrigation depth to
+# what is agronomically sensible for the crop regardless of the computed
+# deficit (e.g. don't recommend 3mm — not worth an irrigation event — or
+# 150mm — runoff/waterlogging risk).
+#
+# uncertainty_factor is on a 0.0-1.0 scale: 0.0 = a well-established,
+# locally-validated value; 1.0 = a generic placeholder with no local
+# validation at all. Every crop below is currently close to 1.0 because none
+# of these values have been validated for Uzbekistan conditions yet — see
+# docs/methodology.md. It feeds into the confidence engine's
+# crop_profile_quality factor.
 
-methodology_version: "0.1.0"
+methodology_version: "0.2.0"
 
 crops:
   cotton:
@@ -24,12 +46,14 @@ crops:
     kc:
       initial: 0.35
       mid: 1.15
-      late: 0.65
-    root_depth_m:
-      initial: 0.3
-      development: 0.6
-      mid: 1.0
-      late: 1.0
+      end: 0.65
+    root_depth_initial_m: 0.3
+    root_depth_max_m: 1.2
+    depletion_fraction: 0.55
+    practical_application_mm:
+      min: 15.0
+      max: 90.0
+    uncertainty_factor: 0.8
 
   wheat:
     label_uz: "Bug'doy"
@@ -41,12 +65,14 @@ crops:
     kc:
       initial: 0.35
       mid: 1.15
-      late: 0.30
-    root_depth_m:
-      initial: 0.3
-      development: 0.6
-      mid: 1.0
-      late: 1.0
+      end: 0.30
+    root_depth_initial_m: 0.3
+    root_depth_max_m: 1.2
+    depletion_fraction: 0.55
+    practical_application_mm:
+      min: 15.0
+      max: 80.0
+    uncertainty_factor: 0.8
 
   orchard:
     label_uz: "Bog' (mevali daraxtlar)"
@@ -58,12 +84,14 @@ crops:
     kc:
       initial: 0.45
       mid: 1.00
-      late: 0.70
-    root_depth_m:
-      initial: 0.5
-      development: 1.0
-      mid: 1.5
-      late: 1.5
+      end: 0.70
+    root_depth_initial_m: 0.5
+    root_depth_max_m: 1.7
+    depletion_fraction: 0.50
+    practical_application_mm:
+      min: 20.0
+      max: 100.0
+    uncertainty_factor: 0.85
 
   vineyard:
     label_uz: "Uzumzor"
@@ -75,12 +103,14 @@ crops:
     kc:
       initial: 0.30
       mid: 0.80
-      late: 0.45
-    root_depth_m:
-      initial: 0.4
-      development: 0.7
-      mid: 1.0
-      late: 1.0
+      end: 0.45
+    root_depth_initial_m: 0.4
+    root_depth_max_m: 1.2
+    depletion_fraction: 0.45
+    practical_application_mm:
+      min: 15.0
+      max: 70.0
+    uncertainty_factor: 0.85
 
   vegetables:
     label_uz: "Sabzavotlar (umumiy)"
@@ -92,9 +122,11 @@ crops:
     kc:
       initial: 0.60
       mid: 1.10
-      late: 0.80
-    root_depth_m:
-      initial: 0.2
-      development: 0.4
-      mid: 0.6
-      late: 0.6
+      end: 0.80
+    root_depth_initial_m: 0.2
+    root_depth_max_m: 0.6
+    depletion_fraction: 0.40
+    practical_application_mm:
+      min: 10.0
+      max: 50.0
+    uncertainty_factor: 0.85

@@ -8,7 +8,7 @@ data: no randomness, no wall-clock dependence.
 """
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
 
@@ -38,3 +38,35 @@ class FixtureSatelliteProvider:
         if not candidates:
             return None
         return max(candidates, key=lambda obs: obs.acquisition_date)
+
+    def get_index_timeseries_for_range(
+        self, polygon: dict, start_date: date, end_date: date
+    ) -> SatelliteTimeseries:
+        """Like get_index_timeseries, but cycles the fixed demo observations
+        (same acquisition spacing, same statistics incl. the deliberately
+        low-quality one) to cover ANY requested [start_date, end_date]
+        instead of only the fixture's own fixed 2024 window. Still fully
+        deterministic and still DEMO/FIXTURE DATA — see
+        FixtureWeatherProvider.get_daily_series_for_range for the same
+        rationale.
+        """
+        base_observations = self._load()
+        if not base_observations:
+            return SatelliteTimeseries(observations=[])
+
+        interval_days = (
+            (base_observations[1].acquisition_date - base_observations[0].acquisition_date).days
+            if len(base_observations) > 1
+            else 7
+        )
+        interval_days = max(interval_days, 1)
+
+        result: list[ParcelObservation] = []
+        index = 0
+        current = start_date
+        while current <= end_date:
+            source = base_observations[index % len(base_observations)]
+            result.append(source.model_copy(update={"acquisition_date": current}))
+            index += 1
+            current += timedelta(days=interval_days)
+        return SatelliteTimeseries(observations=result)
