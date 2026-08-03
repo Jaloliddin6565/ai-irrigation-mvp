@@ -41,6 +41,15 @@ class Settings(BaseSettings):
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # Field polygon validation limits — deliberately conservative defaults;
+    # see docs/validation.md.
+    max_field_area_hectares: float = Field(default=500.0, alias="MAX_FIELD_AREA_HECTARES")
+    max_polygon_vertices: int = Field(default=1000, alias="MAX_POLYGON_VERTICES")
+
+    # List-endpoint pagination limits.
+    default_list_limit: int = Field(default=50, alias="DEFAULT_LIST_LIMIT")
+    max_list_limit: int = Field(default=200, alias="MAX_LIST_LIMIT")
+
     # Weather provider (Open-Meteo) — live mode only.
     open_meteo_base_url: str = Field(
         default="https://api.open-meteo.com/v1/forecast",

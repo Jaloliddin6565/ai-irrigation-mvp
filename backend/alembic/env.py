@@ -2,13 +2,11 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
+# Populates Base.metadata with all model tables for autogenerate.
+import app.db.models  # noqa: F401,E402
 from alembic import context
 from app.db.base import Base
 from app.settings import get_settings
-
-# Import model modules here as they're added in Phase 2 so Base.metadata
-# picks them up for autogenerate, e.g.:
-# from app.db.models import farmer, field, irrigation_event, analysis  # noqa: F401
 
 config = context.config
 
