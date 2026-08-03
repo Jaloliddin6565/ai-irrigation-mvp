@@ -1,8 +1,14 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import config_options, health
-from app.core.errors import AppError, app_error_handler
+from app.api import config_options, farmers, fields, health, irrigations
+from app.core.errors import (
+    AppError,
+    app_error_handler,
+    unhandled_exception_handler,
+    validation_error_handler,
+)
 from app.core.logging import configure_logging
 from app.settings import get_settings
 
@@ -28,6 +34,11 @@ app.add_middleware(
 )
 
 app.add_exception_handler(AppError, app_error_handler)  # type: ignore[arg-type]
+app.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.include_router(health.router)
 app.include_router(config_options.router)
+app.include_router(farmers.router)
+app.include_router(fields.router)
+app.include_router(irrigations.router)

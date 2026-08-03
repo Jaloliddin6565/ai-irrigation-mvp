@@ -47,8 +47,6 @@ class SatelliteProvider(Protocol):
         """Return all usable parcel-level observations in [start_date, end_date]."""
         ...
 
-    def get_latest_observation(
-        self, polygon: dict, as_of: date
-    ) -> ParcelObservation | None:
+    def get_latest_observation(self, polygon: dict, as_of: date) -> ParcelObservation | None:
         """Return the most recent usable observation at or before as_of, if any."""
         ...
