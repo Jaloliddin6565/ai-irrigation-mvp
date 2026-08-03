@@ -1,0 +1,100 @@
+# Crop profiles — GENERIC FAO-56-STYLE PLACEHOLDER VALUES.
+#
+# These Kc curves, stage lengths, and root depths are representative
+# textbook values (FAO Irrigation and Drainage Paper 56, Annex 12 style),
+# NOT calibrated for Uzbekistan varieties, climate, or agronomic practice.
+# They MUST be validated against local field trials before being used to
+# drive real irrigation decisions. Every number here is a starting point,
+# not a fact.
+#
+# Stages: initial -> development -> mid -> late (standard FAO-56 growth
+# staging). Kc values are linearly interpolated between stage midpoints by
+# app/domain/crop_stage.py.
+
+methodology_version: "0.1.0"
+
+crops:
+  cotton:
+    label_uz: "G'o'za"
+    stage_lengths_days:
+      initial: 30
+      development: 50
+      mid: 55
+      late: 45
+    kc:
+      initial: 0.35
+      mid: 1.15
+      late: 0.65
+    root_depth_m:
+      initial: 0.3
+      development: 0.6
+      mid: 1.0
+      late: 1.0
+
+  wheat:
+    label_uz: "Bug'doy"
+    stage_lengths_days:
+      initial: 20
+      development: 25
+      mid: 60
+      late: 30
+    kc:
+      initial: 0.35
+      mid: 1.15
+      late: 0.30
+    root_depth_m:
+      initial: 0.3
+      development: 0.6
+      mid: 1.0
+      late: 1.0
+
+  orchard:
+    label_uz: "Bog' (mevali daraxtlar)"
+    stage_lengths_days:
+      initial: 20
+      development: 70
+      mid: 90
+      late: 60
+    kc:
+      initial: 0.45
+      mid: 1.00
+      late: 0.70
+    root_depth_m:
+      initial: 0.5
+      development: 1.0
+      mid: 1.5
+      late: 1.5
+
+  vineyard:
+    label_uz: "Uzumzor"
+    stage_lengths_days:
+      initial: 20
+      development: 40
+      mid: 120
+      late: 60
+    kc:
+      initial: 0.30
+      mid: 0.80
+      late: 0.45
+    root_depth_m:
+      initial: 0.4
+      development: 0.7
+      mid: 1.0
+      late: 1.0
+
+  vegetables:
+    label_uz: "Sabzavotlar (umumiy)"
+    stage_lengths_days:
+      initial: 20
+      development: 30
+      mid: 40
+      late: 15
+    kc:
+      initial: 0.60
+      mid: 1.10
+      late: 0.80
+    root_depth_m:
+      initial: 0.2
+      development: 0.4
+      mid: 0.6
+      late: 0.6

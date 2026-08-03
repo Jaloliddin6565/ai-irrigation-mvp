@@ -1,0 +1,30 @@
+# Irrigation method efficiency factors — GENERIC PLACEHOLDER VALUES.
+#
+# "efficiency" scales farmer-reported irrigation amounts down to an
+# estimated effective (root-zone-available) amount in the water balance.
+# Representative textbook ranges, not measured for local infrastructure
+# condition. "unknown" uses a conservative middle default.
+
+methodology_version: "0.1.0"
+
+irrigation_methods:
+  drip:
+    label_uz: "Tomchilatib sug'orish"
+    efficiency: 0.90
+
+  sprinkler:
+    label_uz: "Yomg'irlatib sug'orish"
+    efficiency: 0.75
+
+  furrow:
+    label_uz: "Egat bo'ylab sug'orish"
+    efficiency: 0.60
+
+  basin:
+    label_uz: "Chek bo'yicha sug'orish"
+    efficiency: 0.55
+
+  unknown:
+    label_uz: "Noma'lum"
+    efficiency: 0.60
+    requires_field_survey: true

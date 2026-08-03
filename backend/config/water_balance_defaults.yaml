@@ -1,0 +1,29 @@
+# Water-balance engine defaults — GENERIC PLACEHOLDER VALUES.
+# See docs/methodology.md for the full equations these feed into.
+
+methodology_version: "0.1.0"
+
+effective_precipitation_factor: 0.8
+
+satellite:
+  lookback_days: 90
+  min_valid_observations_for_trend: 2
+  trend_adjustment_cap_fraction_of_raw: 0.15
+
+initial_depletion:
+  # Order of preference when initializing the daily water balance for a
+  # field with no prior Analysis history:
+  #   1. recent_irrigation_lookback_days: if an IrrigationEvent exists within
+  #      this many days of the analysis start, assume near-field-capacity
+  #      (near-zero depletion) at that event's date and roll forward.
+  #   2. assume_field_capacity_at_planting: if planting_date is within the
+  #      lookback window, assume near-field-capacity at planting.
+  #   3. conservative_default_fraction_of_raw: otherwise, initialize
+  #      depletion at this fraction of RAW (a middle-ground assumption,
+  #      neither "just irrigated" nor "critically dry").
+  #   4. if none of the above apply and there isn't enough weather/satellite
+  #      history to bridge the gap either, the engine must return
+  #      insufficient_data rather than guess further.
+  recent_irrigation_lookback_days: 5
+  assume_field_capacity_at_planting: true
+  conservative_default_fraction_of_raw: 0.5

@@ -1,0 +1,25 @@
+# Confidence scoring weights — GENERIC PLACEHOLDER VALUES.
+#
+# This produces a 0-1 score from a weighted sum of factor scores (each
+# factor independently scored 0-1 by app/domain/confidence.py), then maps
+# the score to a category via the thresholds below. This is a documented
+# heuristic, not a trained model's probability estimate — see
+# docs/methodology.md.
+
+methodology_version: "0.1.0"
+
+weights:
+  farmer_input_completeness: 0.15
+  last_irrigation_known: 0.10
+  irrigation_amount_known: 0.10
+  satellite_freshness: 0.15
+  valid_pixel_ratio: 0.10
+  observation_count: 0.10
+  crop_profile_quality: 0.10
+  soil_profile_quality: 0.10
+  weather_data_availability: 0.10
+  water_balance_init_certainty: 0.10
+
+thresholds:
+  high: 0.70
+  medium: 0.40
