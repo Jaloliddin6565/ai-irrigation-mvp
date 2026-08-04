@@ -317,3 +317,154 @@ def test_evalscript_declares_all_six_index_outputs_plus_datamask() -> None:
     for index in INDEX_NAMES:
         assert f'"{index}"' in script
     assert '"dataMask"' in script
+
+
+def test_evalscript_requests_plain_dn_bands_not_per_band_units() -> None:
+    # Regression for a real 400 ("Script must return an array") discovered
+    # live during Phase 4.5: the Statistical API rejects a per-band
+    # object-array `bands: [{name, units}, ...]` input specification (it
+    # was also independently confirmed that requesting SCL with
+    # units: "REFLECTANCE" is rejected outright: "Invalid script! Band
+    # 'SCL' ... requested in unsupported units 'REFLECTANCE'"). Bands must
+    # be requested as plain digital-number (DN) band names with no `units`
+    # field, and reflectance is computed in-script.
+    script = build_evalscript()
+    assert '"units"' not in script
+    assert '"REFLECTANCE"' not in script  # as a units value; REFLECTANCE_SCALE (a plain
+    # in-script constant name) is fine and expected — see the scaling test below.
+    assert 'bands: ["B03", "B04", "B05", "B08", "B11", "B12", "SCL", "dataMask"]' in script
+
+
+# Sanitized regression fixture: structurally identical to a real CDSE
+# Statistical API response observed during the Phase 4.5 live connectivity
+# check (numeric values replaced with round placeholders; no identifiers,
+# credentials, or headers were ever part of this response body). Confirms
+# our parser's assumed shape — interval.from/to, outputs.<index>.bands.B0.
+# stats.{sampleCount,noDataCount,mean,stDev,min,max,percentiles} with
+# percentile keys "25.0"/"50.0"/"75.0" — matches what the real API sends,
+# unchanged from what CdseStatisticsClient already assumed.
+_LIVE_SHAPE_REGRESSION_PAYLOAD = {
+    "data": [
+        {
+            "interval": {"from": "2026-07-22T00:00:00Z", "to": "2026-07-23T00:00:00Z"},
+            "outputs": {
+                "ndvi": {
+                    "bands": {
+                        "B0": {
+                            "stats": {
+                                "min": 0.48,
+                                "max": 0.48,
+                                "mean": 0.48,
+                                "stDev": 0.0,
+                                "sampleCount": 1,
+                                "noDataCount": 0,
+                                "percentiles": {"25.0": 0.48, "50.0": 0.48, "75.0": 0.48},
+                            }
+                        }
+                    }
+                },
+                "ndmi": {
+                    "bands": {
+                        "B0": {
+                            "stats": {
+                                "min": 0.17,
+                                "max": 0.17,
+                                "mean": 0.17,
+                                "stDev": 0.0,
+                                "sampleCount": 1,
+                                "noDataCount": 0,
+                                "percentiles": {"25.0": 0.17, "50.0": 0.17, "75.0": 0.17},
+                            }
+                        }
+                    }
+                },
+                "ndre": {
+                    "bands": {
+                        "B0": {
+                            "stats": {
+                                "min": 0.33,
+                                "max": 0.33,
+                                "mean": 0.33,
+                                "stDev": 0.0,
+                                "sampleCount": 1,
+                                "noDataCount": 0,
+                                "percentiles": {"25.0": 0.33, "50.0": 0.33, "75.0": 0.33},
+                            }
+                        }
+                    }
+                },
+                "msi": {
+                    "bands": {
+                        "B0": {
+                            "stats": {
+                                "min": 0.72,
+                                "max": 0.72,
+                                "mean": 0.72,
+                                "stDev": 0.0,
+                                "sampleCount": 1,
+                                "noDataCount": 0,
+                                "percentiles": {"25.0": 0.72, "50.0": 0.72, "75.0": 0.72},
+                            }
+                        }
+                    }
+                },
+                "ndwi": {
+                    "bands": {
+                        "B0": {
+                            "stats": {
+                                "min": -0.5,
+                                "max": -0.5,
+                                "mean": -0.5,
+                                "stDev": 0.0,
+                                "sampleCount": 1,
+                                "noDataCount": 0,
+                                "percentiles": {"25.0": -0.5, "50.0": -0.5, "75.0": -0.5},
+                            }
+                        }
+                    }
+                },
+                "nbr2": {
+                    "bands": {
+                        "B0": {
+                            "stats": {
+                                "min": 0.14,
+                                "max": 0.14,
+                                "mean": 0.14,
+                                "stDev": 0.0,
+                                "sampleCount": 1,
+                                "noDataCount": 0,
+                                "percentiles": {"25.0": 0.14, "50.0": 0.14, "75.0": 0.14},
+                            }
+                        }
+                    }
+                },
+            },
+        }
+    ]
+}
+
+
+@respx.mock
+async def test_parses_the_sanitized_live_response_shape_regression() -> None:
+    _mock_token()
+    respx.post(STATISTICS_URL).mock(
+        return_value=httpx.Response(200, json=_LIVE_SHAPE_REGRESSION_PAYLOAD)
+    )
+    results = await _statistics_client().get_parcel_statistics(
+        VALID_POLYGON, start_date=date(2026, 7, 22), end_date=date(2026, 7, 23)
+    )
+    assert len(results) == 1
+    assert results[0].interval_start == date(2026, 7, 22)
+    assert set(results[0].index_stats.keys()) == set(INDEX_NAMES)
+    assert results[0].index_stats["ndvi"]["p50"] == pytest.approx(0.48)
+    assert results[0].valid_pixel_count == 1
+    assert results[0].invalid_pixel_count == 0
+
+
+def test_evalscript_scales_reflectance_bands_by_the_dn_factor() -> None:
+    script = build_evalscript()
+    assert "REFLECTANCE_SCALE" in script
+    for band in ("B03", "B04", "B05", "B08", "B11", "B12"):
+        assert f"sample.{band} / REFLECTANCE_SCALE" in script
+    # SCL is a classification code, never scaled.
+    assert "sample.SCL / REFLECTANCE_SCALE" not in script

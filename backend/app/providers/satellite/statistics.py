@@ -17,6 +17,26 @@ explicit, documented, tested exclusion class list. The evalscript template
 below reads that list rather than hardcoding its own copy, so a masking
 policy change happens in exactly one place.
 
+Bands are requested as raw digital numbers (DN) — no `units` field at all
+— and reflectance bands (B03/B04/B05/B08/B11/B12) are converted to
+reflectance in-script by dividing by 10000 (the standard Sentinel-2 L2A DN
+scale factor) before computing any index; SCL's raw DN value is used
+directly for masking, unconverted. Two other request shapes were tried
+against the real CDSE Statistical API during the Phase 4.5 live
+connectivity check and both failed: requesting `units: "REFLECTANCE"` for
+every band (including SCL) is rejected outright ("Invalid script! Band
+'SCL' ... requested in unsupported units 'REFLECTANCE'"); requesting
+per-band units via an object-array `bands` (`{name, units}` entries, mixing
+REFLECTANCE and DN in one `input` block) causes a generic, unhelpful
+"Script must return an array" failure with no indication the actual
+problem was the band specification, not `evaluatePixel`'s return shape. A
+second `input` array entry to separate REFLECTANCE bands from DN bands
+(the multi-input-block pattern used to combine different datasets) also
+fails here with "Dataset with id: 1 not found" — that pattern is for
+combining multiple *data sources*, not splitting band-groups within one.
+The plain-band-list-plus-manual-scaling form below is the one verified to
+work end to end against the real API.
+
 The full field polygon (never a centroid or an arbitrary bounding box) is
 sent as the aggregation geometry, so returned percentiles/mean/std describe
 the whole parcel.
@@ -40,21 +60,24 @@ _EVALSCRIPT_TEMPLATE = """//VERSION=3
 function setup() {{
   return {{
     input: [{{
-      bands: ["B03", "B04", "B05", "B08", "B11", "B12", "SCL", "dataMask"],
-      units: "REFLECTANCE"
+      bands: ["B03", "B04", "B05", "B08", "B11", "B12", "SCL", "dataMask"]
     }}],
     output: [
-      {{ id: "ndvi", bands: 1, sampleType: "FLOAT32" }},
-      {{ id: "ndmi", bands: 1, sampleType: "FLOAT32" }},
-      {{ id: "ndre", bands: 1, sampleType: "FLOAT32" }},
-      {{ id: "msi", bands: 1, sampleType: "FLOAT32" }},
-      {{ id: "ndwi", bands: 1, sampleType: "FLOAT32" }},
-      {{ id: "nbr2", bands: 1, sampleType: "FLOAT32" }},
+      {{ id: "ndvi", bands: 1 }},
+      {{ id: "ndmi", bands: 1 }},
+      {{ id: "ndre", bands: 1 }},
+      {{ id: "msi", bands: 1 }},
+      {{ id: "ndwi", bands: 1 }},
+      {{ id: "nbr2", bands: 1 }},
       {{ id: "dataMask", bands: 1 }}
     ]
   }};
 }}
 
+// Sentinel-2 L2A bands arrive as raw DN (digital number); the standard
+// scale factor to reflectance (0.0-1.0) is 10000. SCL is a classification
+// code, not a reflectance value, so it is never divided.
+var REFLECTANCE_SCALE = 10000;
 var EXCLUDED_SCL = {excluded_scl};
 
 function safeRatio(numerator, denominator) {{
@@ -63,16 +86,23 @@ function safeRatio(numerator, denominator) {{
 }}
 
 function evaluatePixel(sample) {{
+  var b03 = sample.B03 / REFLECTANCE_SCALE;
+  var b04 = sample.B04 / REFLECTANCE_SCALE;
+  var b05 = sample.B05 / REFLECTANCE_SCALE;
+  var b08 = sample.B08 / REFLECTANCE_SCALE;
+  var b11 = sample.B11 / REFLECTANCE_SCALE;
+  var b12 = sample.B12 / REFLECTANCE_SCALE;
+
   var maskedOut = sample.dataMask === 0 || EXCLUDED_SCL.indexOf(sample.SCL) !== -1;
   var mask = maskedOut ? 0 : 1;
 
   return {{
-    ndvi: [safeRatio(sample.B08 - sample.B04, sample.B08 + sample.B04)],
-    ndmi: [safeRatio(sample.B08 - sample.B11, sample.B08 + sample.B11)],
-    ndre: [safeRatio(sample.B08 - sample.B05, sample.B08 + sample.B05)],
-    msi: [safeRatio(sample.B11, sample.B08)],
-    ndwi: [safeRatio(sample.B03 - sample.B08, sample.B03 + sample.B08)],
-    nbr2: [safeRatio(sample.B11 - sample.B12, sample.B11 + sample.B12)],
+    ndvi: [safeRatio(b08 - b04, b08 + b04)],
+    ndmi: [safeRatio(b08 - b11, b08 + b11)],
+    ndre: [safeRatio(b08 - b05, b08 + b05)],
+    msi: [safeRatio(b11, b08)],
+    ndwi: [safeRatio(b03 - b08, b03 + b08)],
+    nbr2: [safeRatio(b11 - b12, b11 + b12)],
     dataMask: [mask]
   }};
 }}
