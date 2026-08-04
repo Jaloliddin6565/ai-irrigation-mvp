@@ -40,11 +40,14 @@ o'tkazilgan (3-bosqich): ekin bosqichini aniqlash, aniq boshlang'ich
 holatga ega kunlik suv balansi, ehtiyotkorlik bilan sun'iy yo'ldosh
 tuzatishi va tushuntirilgan ishonch darajasiga ega oraliq ko'rinishidagi
 sug'orish tavsiyasi — qarang `docs/methodology.md` va `docs/api.md`.
-Hozircha barchasi faqat deterministik namunaviy (fixture) ma'lumotlar bilan
-ishlaydi; jonli (live) Sentinel-2/Open-Meteo integratsiyasi 4-bosqichda
-amalga oshiriladi. `main` shoxobchasi faqat xavfsiz asosni saqlaydi; barcha
-ilova ishlari feature-shoxobchalarida olib boriladi va pull request orqali
-qo'shiladi.
+Jonli (live) Open-Meteo va CDSE Sentinel Hub provayderlari (4-bosqich)
+amalga oshirilgan va sinovdan o'tkazilgan (faqat simulyatsiya qilingan
+HTTP orqali) — ammo haqiqiy hisob ma'lumotlari bilan hali tekshirilmagan;
+bu alohida, aniq ruxsat talab qiladigan qadam
+(`backend/scripts/live_smoke_test.py`, qarang `docs/deployment.md`).
+`DATA_MODE=fixture` standart va CI doim shu rejimda ishlaydi. `main`
+shoxobchasi faqat xavfsiz asosni saqlaydi; barcha ilova ishlari
+feature-shoxobchalarida olib boriladi va pull request orqali qo'shiladi.
 
 ## Xavfsizlik holati — boshqa mashinada ishga tushirishdan oldin o'qing
 

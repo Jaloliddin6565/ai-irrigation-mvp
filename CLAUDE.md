@@ -73,11 +73,24 @@ and phased roadmap context.
   into it. Don't conflate them when bumping one or the other.
 - `backend/app/providers/` — the only place external I/O (CDSE, Open-Meteo)
   happens, behind `SatelliteProvider`/`WeatherProvider` interfaces with
-  fixture and live implementations.
+  fixture (`*/fixture.py`) and live (`weather/open_meteo.py`,
+  `satellite/{cdse.py,cdse_auth.py,catalog.py,statistics.py,quality.py,
+  scl.py}`) implementations. `providers/factory.py` is the **only** place
+  `DATA_MODE` selects a concrete provider class — application code (incl.
+  `app/services/analysis.py`) calls the factory, never a concrete provider
+  class directly.
+- `backend/app/core/` — cross-cutting infrastructure with no business logic:
+  `http_client.py` (bounded-retry async HTTP client shared by live
+  providers), `provider_errors.py` (typed `AppError` subclasses for every
+  external-provider failure mode), `cache.py` (in-memory TTL cache for
+  normalized provider responses), plus `errors.py`/`logging.py`.
 - `backend/app/api/` — thin FastAPI routers: validate input, call domain/
   providers, shape output. No business logic here.
 - `backend/config/*.yaml` — all agronomic configuration (crop Kc curves, soil
   parameters, irrigation efficiencies, confidence weights).
+- `backend/scripts/live_smoke_test.py` — the **only** sanctioned way to make
+  a real live-credential request. Never invoked automatically by anything
+  (not CI, not application code) — see rule 7 and `docs/deployment.md`.
 
 ## Persistent in-app disclaimer
 

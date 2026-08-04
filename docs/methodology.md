@@ -3,9 +3,14 @@
 Engine code version (`ANALYSIS_METHODOLOGY_VERSION`, `app/services/analysis.py`): `0.3.0`
 Agronomic config version (`backend/config/*.yaml`): `0.2.0`
 
-Status: Phase 3 complete. Every equation below is implemented as a pure,
+Status: Phase 4 complete. Every equation below is implemented as a pure,
 deterministic function in `backend/app/domain/` and covered by unit tests
-in `backend/tests/unit/`. Fixture mode only — live providers are Phase 4.
+in `backend/tests/unit/`; nothing in this section changed in Phase 4. Live
+Open-Meteo/CDSE Sentinel Hub providers now feed the same equations under
+`DATA_MODE=live` — see "Weather gap handling" and "Satellite qualification"
+below for what's different about live-sourced data, and `docs/api.md`/
+`docs/architecture.md` for the provider implementation itself. Real live
+connectivity has not been exercised yet (only respx-mocked HTTP).
 
 These are two independent version numbers on purpose: the engine version
 tracks the *calculation code*, the config version tracks the *agronomic
@@ -119,6 +124,23 @@ sense of never fabricating a plausible-looking ET0/precipitation value, but
 it can understate depletion if real ET0 that day was non-zero — this
 trade-off is documented, not hidden.
 
+### Weather gap handling in live mode (`OpenMeteoProvider`)
+
+Fixture mode never has gaps (the cycling demo dataset always covers any
+requested window). In live mode, `OpenMeteoProvider` can genuinely fail to
+return a day — e.g. archive reanalysis for very recent dates isn't
+processed yet, or Open-Meteo itself returns `null` for one variable on one
+day. That day is simply **absent** from the series (never zero-filled) and
+reported in `WeatherSeries.coverage.missing_dates` / `coverage_ratio` /
+`completeness_status` (`complete`/`partial`/`insufficient`). The existing
+water-balance no-op-day handling above applies unchanged; Phase 4 only adds
+a warning surfaced on the `Analysis` record so a missing day is visible in
+the API response, not just implicit in a lower `days_covered` count. A
+*malformed* response (mismatched array lengths, missing `daily` block,
+negative ET0/precipitation, unparseable dates) is a hard failure
+(`provider_malformed_response`), not treated as a per-day gap — see
+`docs/api.md`.
+
 ### Initialization (`app/domain/initialization.py`)
 
 The water balance never starts from an unexplained arbitrary depletion. In
@@ -196,6 +218,26 @@ absent satellite data doesn't block the recommendation — it just lowers
 confidence and is flagged (`data_quality`: `ok` / `stale` / `low_quality` /
 `insufficient`).
 
+### Live-mode satellite quality gate (`app/providers/satellite/quality.py`)
+
+In live mode, an extra classification runs **before** the trend logic
+above ever sees an observation: `usable` / `low_valid_pixel_ratio` /
+`stale` / `cloud_contaminated` / `non_finite_values` /
+`malformed_response` / `no_data` / `insufficient_observations`. Corrupt or
+non-physical results (`non_finite_values`, `cloud_contaminated`,
+`malformed_response`, `no_data`) never reach the trend logic at all — they
+are provider-layer defects, not a legitimate "dry"/"wet" signal.
+`stale`/`low_valid_pixel_ratio` observations **are** passed through,
+because the trend logic above already has its own freshness/pixel-ratio
+thresholds and is specifically designed to react to them (skip the
+adjustment, lower confidence) rather than being filtered on the same two
+dimensions twice with different numbers. Every acquisition the CDSE Catalog
+API found but excluded (e.g. over the configured cloud-cover threshold) is
+recorded with its rejection reason in `satellite_summary`/
+`rejected_acquisitions`, never silently dropped. This never converts a
+spectral index into an exact root-zone soil-moisture value, live or
+fixture.
+
 ## Recommendation (`app/domain/recommendation.py`)
 
 Status is driven by the (satellite-qualified) depletion as a fraction of
@@ -269,8 +311,14 @@ repeated here deliberately.
 
 ## Known limitations
 
-- No live Sentinel-2/Open-Meteo integration yet (Phase 4) — all satellite
-  and weather data in this MVP is deterministic fixture/demo data.
+- Live Sentinel-2/Open-Meteo connectivity is implemented and covered by
+  mocked tests only — a real live-credential smoke test
+  (`backend/scripts/live_smoke_test.py`) has not been run yet and requires
+  separate explicit approval (see CLAUDE.md "Data modes").
+- The Statistical API response parser (`app/providers/satellite/
+  statistics.py`) is modelled on Sentinel Hub's documented response shape;
+  exact field names should be re-verified against a real response during
+  that future live smoke test.
 - Bare-soil evaporation pre-planting isn't modelled (Kc = 0).
 - A missing weather day is treated as a ETc/precipitation no-op, which can
   understate depletion across data gaps.

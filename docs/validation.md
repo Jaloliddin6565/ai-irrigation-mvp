@@ -1,9 +1,10 @@
 # Validation rules
 
-Status: Phase 3 complete. `Farmer`/`Field`/`IrrigationEvent` CRUD validation
-(Phase 2) plus the analysis engine's input/calculation validation (Phase 3)
-are implemented and tested; see `docs/api.md` for the endpoint-level
-contract and `docs/methodology.md` for the calculations these rules feed.
+Status: Phase 4 complete. `Farmer`/`Field`/`IrrigationEvent` CRUD validation
+(Phase 2), the analysis engine's input/calculation validation (Phase 3),
+and live-provider response validation (Phase 4) are implemented and
+tested; see `docs/api.md` for the endpoint-level contract and
+`docs/methodology.md` for the calculations these rules feed.
 
 (This file covers the same ground the plan referred to as
 "docs/validation-plan.md" — kept as `docs/validation.md`, the file that
@@ -88,9 +89,32 @@ non-negative irrigation amounts/rates. `Farmer.phone` is unique. Covered by
   date) is rejected with `422 validation_error` by the Pydantic request
   schema before any engine code runs.
 
+## Live-provider response validation (implemented — `app/providers/weather/open_meteo.py`, `app/providers/satellite/{catalog,statistics}.py`)
+
+- Open-Meteo: structural checks (a `daily` block exists, every requested
+  variable's array length matches `time`), non-negative ET0/precipitation,
+  parseable dates, duplicate-date detection (first occurrence kept, a
+  warning logged), sorted output. Any structural failure raises
+  `provider_malformed_response` rather than passing through partial data.
+- CDSE Catalog: geometry validated (must be a well-formed `Polygon`) before
+  submission; response must have a `features` array; malformed feature
+  entries are skipped, not fatal; cloud-cover filtering records a reason
+  per rejected acquisition rather than silently dropping it; pagination is
+  bounded (`MAX_PAGES = 5`) so a misbehaving `next` link can't loop forever.
+- CDSE Statistical API: per-interval, per-index — `sampleCount`/
+  `noDataCount` must be non-negative integers with `sampleCount > 0`;
+  percentile/mean/std values must be finite (`math.isnan`/`math.isinf`
+  checked) or the whole interval is dropped, never partially reported.
+- All three raise typed `app/core/provider_errors.py` exceptions (mapped to
+  502/503/504/422 — see `docs/api.md` "Structured provider errors"), never
+  a raw stack trace or a silently-degraded result.
+
 ## Determinism as a validation concern
 
 Fixture-mode provider responses are validated the same way live responses
-will be (same Pydantic models in `app/providers/*/base.py`), so a fixture
-payload that wouldn't pass real validation is caught immediately rather
-than only surfacing once live mode is wired up in Phase 4.
+are (same Pydantic models in `app/providers/*/base.py`), so a fixture
+payload that wouldn't pass real validation would be caught immediately.
+Live-provider code paths are exercised only via respx-mocked HTTP
+(`backend/tests/integration/`) — no test in this repository ever makes a
+real external request; see `docs/security.md` "Live-credential handling
+status" for what remains unverified until a separately-approved smoke test.

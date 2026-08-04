@@ -1,13 +1,14 @@
 # Architecture
 
-Status: Phase 3 complete. Farmer/Field/IrrigationEvent CRUD, GeoJSON polygon
-validation, and the full deterministic analysis pipeline (crop stage →
-water balance → initialization → satellite qualification → recommendation
-→ confidence → persistence) are implemented and tested — see
+Status: Phase 4 complete. Farmer/Field/IrrigationEvent CRUD, GeoJSON polygon
+validation, the full deterministic analysis pipeline (crop stage → water
+balance → initialization → satellite qualification → recommendation →
+confidence → persistence), and live Open-Meteo/CDSE Sentinel Hub providers
+behind the same provider interfaces are implemented and tested — see
 docs/methodology.md for the calculations and docs/api.md for the endpoint
-contract. Live provider integrations (real Sentinel-2/Open-Meteo) are
-Phase 4 — this document describes the shape already in place and the shape
-being built toward.
+contract. Real live connectivity has **not** been exercised yet (that is a
+separately-approved smoke test, see `backend/scripts/live_smoke_test.py`);
+everything here is verified against respx-mocked HTTP.
 
 ## Monorepo layout
 
@@ -35,7 +36,12 @@ domain/       Pure business logic. No I/O, no framework imports, no randomness.
               dependency.
 providers/    The only place external I/O happens (CDSE, Open-Meteo), behind
               SatelliteProvider / WeatherProvider interfaces with fixture and
-              live implementations selected by DATA_MODE.
+              live implementations. factory.py is the single DATA_MODE-driven
+              selection point application code must go through.
+core/         http_client.py (bounded-retry async httpx wrapper),
+              provider_errors.py (typed AppError subtypes for every external-
+              provider failure mode), cache.py (in-memory TTL cache), plus
+              the pre-existing errors.py/logging.py.
 db/           SQLAlchemy 2.0 declarative models (models/farmer.py, field.py,
               irrigation_event.py, analysis.py) + session management.
 schemas/      Pydantic v2 request/response DTOs — separate from the ORM models
@@ -59,38 +65,108 @@ never leaves partial state in the database.
 ```
 SatelliteProvider (Protocol)         WeatherProvider (Protocol)
   ├── FixtureSatelliteProvider         ├── FixtureWeatherProvider
-  └── CdseSentinelHubProvider (Phase4) └── OpenMeteoProvider (Phase 4)
+  └── CdseSentinelHubProvider          └── OpenMeteoProvider
 ```
 
-Fixture implementations read static JSON under `backend/fixtures/` and are
-used for all local development, CI, and demos. Live implementations call
-real external services and are added in Phase 4 — see `docs/data_modes.md`.
+`app/providers/factory.py::get_weather_provider()`/`get_satellite_provider()`
+are the **only** place `DATA_MODE` is read to pick a concrete provider class
+— `app/services/analysis.py` and the `/satellite-timeseries`/`/weather`
+endpoints call the factory, never a concrete provider class, so live mode
+can never end up silently using fixture data by one call site forgetting to
+check the mode.
 
-Each fixture provider has two access patterns: the original Phase 1
-`get_daily_series`/`get_index_timeseries` (filters the static file by
-absolute calendar date — only returns data if the request overlaps the
-file's own fixed 2024 demo window) and a Phase 3 addition,
-`get_daily_series_for_range`/`get_index_timeseries_for_range`, which
-*cycles* the same fixed, non-random values to cover **any** requested date
-range. The analysis service uses the latter exclusively, since a real
-`Field.planting_date`/analysis date will essentially never fall inside a
-hardcoded 2024 window — this is what makes fixture mode usable for
-analyses run "today" rather than only on one canned historical date.
-Still fully deterministic (same request → same output) and still labelled
-`DEMO / FIXTURE DATA`; only the calendar alignment is remapped.
+Fixture implementations read static JSON under `backend/fixtures/` and are
+used for all local development, CI, and demos. Each fixture provider has two
+access patterns: the original Phase 1 `get_daily_series`/
+`get_index_timeseries` (filters the static file by absolute calendar date —
+only returns data if the request overlaps the file's own fixed 2024 demo
+window) and a Phase 3 addition, `get_daily_series_for_range`/
+`get_index_timeseries_for_range`, which *cycles* the same fixed, non-random
+values to cover **any** requested date range. The analysis service uses the
+latter exclusively. Still fully deterministic and still labelled
+`DEMO / FIXTURE DATA`; only the calendar alignment is remapped. Live
+providers implement the same two method names with real logic — no cycling,
+no fabricated dates.
+
+### Live weather — `OpenMeteoProvider` (`app/providers/weather/open_meteo.py`)
+
+Splits a requested range at `as_of`: dates `<= as_of` come from the archive
+API (`OPEN_METEO_ARCHIVE_URL`), dates `> as_of` from the forecast API
+(`OPEN_METEO_FORECAST_URL`). A date Open-Meteo doesn't return (or returns as
+`null`) is simply absent from `WeatherSeries.days` and reported in
+`WeatherSeries.coverage` (`requested_start/end_date`, `received_start/
+end_date`, `missing_dates`, `coverage_ratio`, `completeness_status`) — never
+zero-filled. `precipitation_probability_pct` is `100.0` for archive
+(already-observed) days, since forecast probability doesn't apply to the
+past — a documented convention, not fabricated data.
+
+### Live satellite — `CdseSentinelHubProvider` (`app/providers/satellite/cdse.py`)
+
+Composes three pieces, each independently testable:
+
+- **`cdse_auth.CdseTokenClient`** — OAuth client-credentials flow, in-memory
+  token cache with an expiry margin, one automatic 401-triggered refresh+
+  retry (never a loop). A single process-lifetime instance is shared across
+  requests (`factory._cdse_token_client()`, `@lru_cache`) so tokens are
+  genuinely reused, not re-fetched per analysis.
+- **`catalog.CdseCatalogClient`** — Sentinel-2 L2A acquisition search (STAC
+  Catalog API) against the field's **actual stored polygon** (never a
+  centroid or bounding box), filtering by `MAX_SCENE_CLOUD_COVER` and
+  recording *why* an acquisition was rejected rather than dropping it
+  silently (`RejectedAcquisition`).
+- **`statistics.CdseStatisticsClient`** — full-polygon Statistical API call
+  computing NDVI/NDMI/NDRE/MSI/NDWI/NBR2 via a documented evalscript
+  (`build_evalscript()`), masked by `dataMask` and the SCL exclusion list in
+  `scl.py`. An interval with non-finite values, a zero sample count, or a
+  malformed shape is dropped, never reported with an invented number.
+
+`providers/satellite/quality.py` then classifies each parsed observation
+(`usable`/`low_valid_pixel_ratio`/`stale`/`cloud_contaminated`/
+`non_finite_values`/`malformed_response`/...) **before** it ever reaches
+`app/domain/satellite_adjustment.py`. This is a provider-layer gate distinct
+from — and upstream of — the existing Phase 3 domain-layer trend logic:
+quality.py rejects corrupt/non-physical data outright; the domain layer's
+own freshness/pixel-ratio thresholds still apply to what's left (an
+observation tagged `stale`/`low_valid_pixel_ratio` is passed through to
+`app/services/analysis.py`'s `sat_observation_inputs`, since the domain
+layer already reacts to those two dimensions itself — see
+docs/methodology.md).
+
+### Shared HTTP/error/cache infrastructure
+
+Both live providers build requests through `core/http_client.py`'s
+`RetryingHttpClient` — bounded exponential-backoff retries only on
+429/500/502/503/504/timeout/connection-error, never on other 4xx (those are
+permanent from the caller's perspective) — and raise typed
+`core/provider_errors.py` exceptions (all `AppError` subclasses, so they
+flow through the existing structured-error response pipeline with no new
+FastAPI wiring). Normalized responses are cached in `core/cache.py`'s
+`TTLCache` (in-memory, process-local, deterministic — see the module
+docstring for the documented future Redis-swap path), keyed on request
+parameters only (coordinates/polygon/date-range), never on credentials.
 
 ## Analysis orchestration (`app/services/analysis.py`)
 
 `analyze_field()` runs, per request: resolve crop/soil/irrigation-method
 config profiles (with per-field overrides applied) → crop stage at
-`analysis_date` → fetch fixture weather + satellite over the lookback
-window → determine initialization (§ methodology) → run the daily water
-balance from the initialization anchor to `analysis_date` → determine the
-satellite adjustment → compute confidence → compute the recommendation →
-persist an `Analysis` row → return the full structured response. Every
-step is a call into a `domain/` pure function; the service's job is purely
-data plumbing (DB reads, provider calls, assembling inputs), never
+`analysis_date` → get providers from `providers/factory.py` (DATA_MODE-
+driven) → fetch weather + satellite over the lookback window, using the
+field's real polygon for satellite → determine initialization
+(§ methodology) → run the daily water balance from the initialization
+anchor to `analysis_date` → determine the satellite adjustment (only on
+observations that passed the provider-layer quality gate) → compute
+confidence → compute the recommendation → persist an `Analysis` row →
+return the full structured response. Every calculation step is a call into
+a `domain/` pure function; the service's job is data plumbing (DB reads,
+provider calls, assembling inputs) plus provider selection, never
 calculation logic itself.
+
+If the live weather provider reports missing dates within the
+water-balance window (`WeatherSeries.coverage.missing_dates`), a
+human-readable warning is added to the persisted `Analysis.warnings` — the
+underlying missing days are still handled the way Phase 3 always handled
+them (an explicit no-op day in `water_balance.py`, never a fabricated
+zero), this just makes the gap visible in the response too.
 
 `Analysis`'s four JSON columns (from the Phase 2 schema) carry more than
 their names suggest: `water_balance_summary` nests `input_summary` (a

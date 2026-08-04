@@ -22,18 +22,32 @@ implementations the composition root wires up. Application code in
 
 - Requires real CDSE (`CDSE_CLIENT_ID`/`CDSE_CLIENT_SECRET`) and reaches
   Open-Meteo without a key.
-- `Settings.require_live_satellite_credentials()` raises immediately if
-  live mode is selected without CDSE credentials configured — this is a
-  hard failure, not a fallback trigger.
-- **Never silently falls back to fixture mode.** A failed or absent live
-  provider surfaces as an explicit error (`insufficient_satellite_data`,
-  `insufficient_data`, or a provider/config error) — never fixture data
+- `Settings.require_live_satellite_credentials()` (wrapped by
+  `providers/factory.py` into a structured `provider_configuration_error`,
+  HTTP 503) raises immediately if live mode is selected without CDSE
+  credentials configured — this is a hard, clearly-reported failure, not a
+  fallback trigger.
+- **Never silently falls back to fixture mode.** `app/providers/factory.py`
+  is the only place `DATA_MODE` selects a concrete provider class; a failed
+  or absent live provider surfaces as an explicit, typed error (see
+  `docs/api.md` "Structured provider errors") — never fixture data
   presented as if it were live.
-- **Never fabricates replacement data.** If Sentinel-2 has no usable
-  observation for the lookback window, or weather data is unavailable, the
-  result says so rather than inventing a plausible-looking number.
-- Not implemented yet — live providers land in Phase 4. Not exercised in
-  CI under any circumstance.
+- **Never fabricates replacement data.** If the CDSE Catalog API has no
+  usable acquisition for the lookback window, `CdseSentinelHubProvider`
+  returns an empty observation list (never a synthesized one). If
+  Open-Meteo can't return a day, that day is absent from `WeatherSeries`
+  and reported in `coverage.missing_dates`, never zero-filled.
+- Implemented and covered by respx-mocked tests
+  (`backend/tests/integration/test_live_mode_analysis.py` and the
+  provider-level test files alongside it). Real live connectivity has not
+  been exercised — see `backend/scripts/live_smoke_test.py`, which requires
+  a separate, explicit, manually-run approval step. Never exercised in CI
+  under any circumstance.
+- Provider responses are cached in-memory (`WEATHER_CACHE_TTL_SECONDS`/
+  `SATELLITE_CACHE_TTL_SECONDS`) and outbound HTTP uses bounded
+  exponential-backoff retries only on transient failures (429/5xx/timeout/
+  network) — see `docs/architecture.md` "Shared HTTP/error/cache
+  infrastructure".
 
 ## Why this split exists
 

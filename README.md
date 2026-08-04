@@ -36,9 +36,13 @@ The full deterministic analysis pipeline is implemented and tested (Phase
 3): crop-stage determination, daily water balance with an explicit
 initialization strategy, conservative satellite qualification, and a
 range-based irrigation recommendation with an explainable confidence
-score — see `docs/methodology.md` and `docs/api.md`. Everything currently
-runs against deterministic fixture data only; live Sentinel-2/Open-Meteo
-integration is Phase 4. `main` only carries the secure foundation; all
+score — see `docs/methodology.md` and `docs/api.md`. Live Open-Meteo and
+CDSE Sentinel Hub providers (Phase 4) are implemented behind the same
+provider interfaces and covered by mocked tests, but have **not** been
+exercised against real credentials yet — that is a separate, explicitly
+manual step (`backend/scripts/live_smoke_test.py`, see `docs/deployment.md`
+and `docs/security.md`). `DATA_MODE=fixture` remains the default and the
+only mode CI ever runs. `main` only carries the secure foundation; all
 application work happens on feature branches and lands via pull request.
 
 ## Security posture — read before running anywhere but your own machine
@@ -63,7 +67,9 @@ rewrite — but it does not exist yet.
   Identical inputs always produce identical outputs.
 - `DATA_MODE=live` — real Sentinel Hub (Copernicus Data Space Ecosystem) and
   Open-Meteo calls. Fails clearly if credentials are missing; never silently
-  falls back to fixture data, and never fabricates replacement values.
+  falls back to fixture data, and never fabricates replacement values. See
+  `docs/deployment.md` for setup and `docs/data_modes.md` for the full
+  contract.
 
 ## Getting started (fixture mode)
 

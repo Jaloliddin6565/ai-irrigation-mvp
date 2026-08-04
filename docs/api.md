@@ -1,9 +1,35 @@
 # API reference
 
-Status: Phase 3 — farmer/field/irrigation CRUD plus the full analysis
-pipeline (fixture data only; no authentication — see `docs/security.md`).
-Interactive docs are always available at `/docs` (Swagger UI) and `/redoc`
-when the backend is running.
+Status: Phase 4 — farmer/field/irrigation CRUD, the full analysis
+pipeline, and live Open-Meteo/CDSE Sentinel Hub providers behind
+`DATA_MODE=live` (no authentication — see `docs/security.md`). Interactive
+docs are always available at `/docs` (Swagger UI) and `/redoc` when the
+backend is running.
+
+## CDSE endpoint verification
+
+CDSE (Copernicus Data Space Ecosystem) Sentinel Hub endpoint paths were
+verified against official Copernicus documentation on **2026-08-04**:
+
+- OAuth token: `https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token`
+- Sentinel Hub base: `https://sh.dataspace.copernicus.eu`
+- Catalog API: `https://sh.dataspace.copernicus.eu/catalog/v1/search`
+- Statistical API: `https://sh.dataspace.copernicus.eu/statistics/v1`
+- Process API: `https://sh.dataspace.copernicus.eu/process/v1`
+
+Copernicus announced a path-format migration effective 2026-03-17: both the
+legacy format (`/api/v1/<service>`) and the new format (`/<service>/v1`,
+used above) work with no breaking change during the rollout. Every one of
+these URLs is a `Settings` field (`CDSE_TOKEN_URL`, `CDSE_CATALOG_URL`,
+`CDSE_STATISTICS_URL`, `CDSE_PROCESS_URL`) — a future path change is a
+config edit, not a code change. Re-verify this list before the first real
+live-credential smoke test (`backend/scripts/live_smoke_test.py`), since it
+has not been exercised against the real API yet.
+
+Open-Meteo requires no API key for non-commercial use;
+`OPEN_METEO_ARCHIVE_URL`/`OPEN_METEO_FORECAST_URL` are likewise
+`Settings` fields, verified against https://open-meteo.com/en/docs the same
+date.
 
 Every error response uses the same structured shape:
 
@@ -116,8 +142,12 @@ initialization → satellite qualification → recommendation → confidence),
 persists a new `Analysis` row (**never overwrites a previous one**), and
 returns `201` with the full response (see below). `404 field_not_found` if
 the field doesn't exist; `422 validation_error` for a malformed
-`analysis_date`. `DATA_MODE=live` isn't wired up yet (Phase 4) — this
-endpoint only ever uses fixture data in this MVP.
+`analysis_date`. Provider selection is `DATA_MODE`-driven
+(`app/providers/factory.py`): `fixture` uses the deterministic demo
+providers described throughout this doc; `live` calls real Open-Meteo/CDSE
+Sentinel Hub — see "Structured provider errors" below for how a live-mode
+failure is reported. Live mode is never used in CI and has not yet been
+exercised against real credentials (see `docs/data_modes.md`).
 
 Response shape:
 
@@ -127,8 +157,8 @@ Response shape:
   "data_mode": "fixture", "methodology_version": "0.3.0",
   "field_summary": { "...": "crop/soil/method/area snapshot at analysis time" },
   "crop_stage": { "days_after_planting": 61, "stage": "development", "kc": 0.75, "root_depth_m": 0.75, "depletion_fraction": 0.55, "stage_overridden": false, "assumptions": [], "warnings": [] },
-  "weather_summary": { "data_mode": "fixture", "start_date": "...", "end_date": "...", "days_covered": 62, "days_missing": 0, "total_et0_mm": 232.1, "total_precipitation_mm": 14.0, "forecast_precipitation_mm": 0.0, "forecast_window_hours": 60 },
-  "satellite_summary": { "data_mode": "fixture", "observations_considered": 13, "valid_observations_used": 3, "latest_observation_date": "...", "latest_observation_age_days": 6, "latest_valid_pixel_ratio": 0.93, "data_quality": "ok", "adjustment_applied": true, "adjustment_mm": 4.2, "reasons": ["..."] },
+  "weather_summary": { "data_mode": "fixture", "start_date": "...", "end_date": "...", "days_covered": 62, "days_missing": 0, "total_et0_mm": 232.1, "total_precipitation_mm": 14.0, "forecast_precipitation_mm": 0.0, "forecast_window_hours": 60, "provider": "fixture", "source": "DEMO / FIXTURE DATA", "retrieved_at": null, "cache_hit": false, "missing_dates": [], "coverage_ratio": 1.0, "completeness_status": "complete" },
+  "satellite_summary": { "data_mode": "fixture", "observations_considered": 13, "valid_observations_used": 3, "latest_observation_date": "...", "latest_observation_age_days": 6, "latest_valid_pixel_ratio": 0.93, "data_quality": "ok", "adjustment_applied": true, "adjustment_mm": 4.2, "reasons": ["..."], "provider": "fixture", "source": "DEMO / FIXTURE DATA", "retrieved_at": null, "cache_hit": false, "rejected_acquisitions_count": 0 },
   "water_balance_summary": { "initialization": {"method": "recent_irrigation_known_amount", "start_date": "...", "starting_depletion_mm": 82.0, "uncertainty": 0.2, "warnings": []}, "taw_mm": 150.0, "raw_mm": 82.5, "depletion_before_satellite_adjustment_mm": 76.2, "satellite_adjustment_mm": 4.2, "depletion_mm": 80.4, "start_date": "...", "end_date": "2026-06-01", "daily_rows": [ "...one row per day, see docs/methodology.md" ] },
   "recommendation": { "status": "irrigate_now", "recommended_min_mm": 71.4, "recommended_max_mm": 90.0, "recommended_min_m3_per_ha": 714.0, "recommended_max_m3_per_ha": 900.0, "total_min_volume_m3": 664.0, "total_max_volume_m3": 837.1, "window_start_date": "2026-06-01", "window_end_date": "2026-06-02", "reasons": ["..."], "warnings": ["..."] },
   "confidence": { "score": 0.75, "category": "high", "factor_scores": {"...": "..."}, "weights": {"...": "..."}, "triggered_caps": [], "positive_factors": ["..."], "negative_factors": ["..."] },
@@ -160,12 +190,43 @@ The full response shape above, reconstructed from the persisted record.
 GET /api/fields/{field_id}/satellite-timeseries?start_date=&end_date=
 GET /api/fields/{field_id}/weather?start_date=&end_date=
 ```
-Direct fixture-provider access (same data the analyze pipeline uses),
-independent of any persisted `Analysis` — useful for charting history
-without running a full analysis. Both default their date range to the
-configured satellite lookback window (+ the forecast window, for weather)
-ending today, and both are explicitly `"data_mode": "fixture"` in the
-response. `404 field_not_found` if the field doesn't exist.
+Direct provider access (the same `DATA_MODE`-selected provider the analyze
+pipeline uses — see `app/providers/factory.py`), independent of any
+persisted `Analysis` — useful for charting history without running a full
+analysis. Both default their date range to the configured satellite
+lookback window (+ the forecast window, for weather) ending today. The
+satellite endpoint always queries the field's actual stored polygon (never
+a centroid). Response fields `provider`/`source`/`retrieved_at`/
+`cache_hit` identify where the data came from (`"fixture"`/
+`"DEMO / FIXTURE DATA"` in fixture mode; `"open-meteo"`/`"cdse-sentinel-hub"`
+and a real timestamp in live mode); `satellite-timeseries` also returns
+`rejected_acquisitions` (date + reason, live mode only) and `weather`
+returns `coverage` (requested/received range, missing dates, completeness
+status). `404 field_not_found` if the field doesn't exist.
+
+## Structured provider errors (live mode)
+
+Every external-provider failure (`app/core/provider_errors.py`) is an
+`AppError` subclass, so it returns the same `{code, message_uz, message_en,
+details}` shape as any other domain error, with `details.provider` and
+`details.retryable` — never a token, client secret, or raw upstream
+response body:
+
+| `code` | status | meaning |
+|---|---|---|
+| `provider_configuration_error` | 503 | `DATA_MODE=live` without `CDSE_CLIENT_ID`/`CDSE_CLIENT_SECRET` configured |
+| `provider_authentication_error` | 502 | CDSE rejected the OAuth client credentials |
+| `provider_rate_limited` | 503 | upstream returned 429 after retries exhausted |
+| `provider_timeout` | 504 | upstream request timed out after retries |
+| `provider_network_error` | 502 | connection-level failure after retries |
+| `provider_server_error` | 502 | upstream 5xx after retries exhausted |
+| `provider_malformed_response` | 502 | response failed structural/type validation |
+| `unsupported_geometry` | 422 | polygon isn't a valid GeoJSON `Polygon` |
+| `invalid_date_range` | 422 | `end_date` before `start_date` |
+
+Outbound HTTP (`app/core/http_client.py`) retries only 429/500/502/503/504
+and connection timeouts, with bounded exponential backoff — never other
+4xx, and never unboundedly.
 
 ## Geometry validation rules (`POST`/`PATCH` field polygon)
 

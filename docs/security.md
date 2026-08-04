@@ -28,8 +28,12 @@ be read as a security control against an untrusted caller.
 - `.gitignore` excludes `.env`, `.venv/`, `node_modules/`, `*.db`, and
   other local/build artifacts.
 - CDSE OAuth client credentials and bearer tokens are handled server-side
-  only (Phase 4) — never returned in an API response, never sent to the
-  frontend.
+  only (`app/providers/satellite/cdse_auth.py`) — the access token lives
+  only in an in-memory, process-lifetime cache; it is never persisted to
+  the database, never written to a file, never returned in an API
+  response, and never appears in a log line or exception message (verified
+  by `backend/tests/integration/test_cdse_auth.py` and
+  `test_live_mode_analysis.py::test_no_secret_or_token_appears_anywhere_in_the_api_response`).
 - Logging must redact `Authorization`/cookie headers
   (`app/core/logging.py::redact_headers`) before anything is ever logged.
 - CI never references real provider credentials; it only runs
@@ -41,10 +45,12 @@ be read as a security control against an untrusted caller.
 
 - CORS allow-list is read from `CORS_ALLOWED_ORIGINS` (comma-separated),
   not `*`, and defaults to the local dev frontend origin only.
-- All outbound HTTP calls to external providers (Phase 4) use explicit
-  timeouts and a small bounded number of retries on transient failures
-  only (timeouts, 429, 5xx) — never retried into different behavior, and
-  never silently substituting fixture data for a failed live call.
+- All outbound HTTP calls to external providers (`app/core/http_client.py`)
+  use explicit timeouts and a small bounded number of exponential-backoff
+  retries on transient failures only (timeouts, connection errors, 429,
+  500/502/503/504) — never retried into different behavior, and never
+  silently substituting fixture data for a failed live call (see
+  `docs/data_modes.md`).
 
 ## Input validation (see also `docs/validation.md` and `docs/api.md`)
 
@@ -65,9 +71,18 @@ be read as a security control against an untrusted caller.
   clear `code` is returned — the database session stays usable for
   subsequent requests rather than being left in a broken state.
 
+## Live-credential handling status
+
+Live-mode provider code exists and is covered by respx-mocked tests, but
+**no request has ever been made with real CDSE/Open-Meteo credentials**.
+`backend/scripts/live_smoke_test.py` is the documented, explicitly-manual
+path for that first real connectivity check — it reads credentials only
+from a local, untracked `.env`, never prints a secret or token, and is
+never invoked automatically (not from CI, not from any application code).
+
 ## What's intentionally deferred
 
 - Authentication/authorization beyond the no-op seam described above.
 - Rate limiting / abuse protection on public endpoints.
-- Any live-credential handling — not implemented until Phase 4, and never
-  exercised in CI.
+- Server-generated preview images (Process API) — optional per the Phase 4
+  scope, deferred to a later phase.
