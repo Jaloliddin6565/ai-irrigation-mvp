@@ -70,8 +70,16 @@ def live_mode(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
 @pytest.fixture
 def live_mode_no_credentials(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     monkeypatch.setenv("DATA_MODE", "live")
-    monkeypatch.delenv("CDSE_CLIENT_ID", raising=False)
-    monkeypatch.delenv("CDSE_CLIENT_SECRET", raising=False)
+    # Set to an empty string rather than deleting: pydantic-settings reads
+    # os.environ *and* the local .env file, with os.environ taking
+    # priority — but only if the key is actually present there. A
+    # developer machine's real, untracked .env (Phase 4.5) may itself
+    # contain real credentials, so deleting the env var would let the
+    # value silently fall through from that file, defeating this test.
+    # An explicit empty string in os.environ always wins and is falsy,
+    # matching require_live_satellite_credentials()'s "not set" check.
+    monkeypatch.setenv("CDSE_CLIENT_ID", "")
+    monkeypatch.setenv("CDSE_CLIENT_SECRET", "")
     get_settings.cache_clear()
     provider_factory._weather_cache.cache_clear()
     provider_factory._satellite_cache.cache_clear()

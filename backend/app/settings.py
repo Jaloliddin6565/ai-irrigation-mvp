@@ -13,7 +13,7 @@ from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
@@ -124,6 +124,16 @@ class Settings(BaseSettings):
     map_tile_attribution: str = Field(
         default="© OpenStreetMap contributors", alias="MAP_TILE_ATTRIBUTION"
     )
+
+    @field_validator("max_satellite_observation_age_days", mode="before")
+    @classmethod
+    def _blank_means_unset(cls, value: object) -> object:
+        # .env.example documents this as an optional, commonly-blank field
+        # (no freshness cap by default) — an empty string from a real .env
+        # must resolve to "unset", not a parse error.
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
 
     @property
     def cors_allowed_origins_list(self) -> list[str]:
