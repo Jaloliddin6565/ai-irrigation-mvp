@@ -43,8 +43,7 @@ from app.domain.water_balance import (
     compute_taw,
     run_daily_water_balance,
 )
-from app.providers.satellite.fixture import FixtureSatelliteProvider
-from app.providers.weather.fixture import FixtureWeatherProvider
+from app.providers.factory import get_satellite_provider, get_weather_provider
 from app.repositories import analyses as analyses_repo
 from app.schemas.analysis import (
     AnalysisListItem,
@@ -61,7 +60,7 @@ from app.schemas.analysis import (
     WeatherSummary,
 )
 from app.services.fields import get_field_or_404
-from app.settings import FIXTURES_DIR, get_settings
+from app.settings import get_settings
 
 ANALYSIS_METHODOLOGY_VERSION = "0.3.0"
 
@@ -249,8 +248,11 @@ def analyze_field(
         for event in irrigation_events_orm
     ]
 
-    weather_provider = FixtureWeatherProvider(FIXTURES_DIR)
-    satellite_provider = FixtureSatelliteProvider(FIXTURES_DIR)
+    # DATA_MODE-driven selection only — see app/providers/factory.py. Never
+    # instantiate a concrete provider class here directly, so live mode can
+    # never silently end up using fixture data.
+    weather_provider = get_weather_provider()
+    satellite_provider = get_satellite_provider()
 
     weather_series = weather_provider.get_daily_series_for_range(
         field.centroid_latitude,
@@ -262,8 +264,23 @@ def analyze_field(
     weather_by_date = {d.date: d for d in weather_series.days}
     weather_available_dates_past = [d for d in weather_by_date if d <= analysis_date]
 
+    if weather_series.coverage and weather_series.coverage.missing_dates:
+        past_missing = [d for d in weather_series.coverage.missing_dates if d <= analysis_date]
+        if past_missing:
+            all_warnings_weather_gap = (
+                f"Weather data unavailable for {len(past_missing)} day(s) in the requested "
+                f"range ({weather_series.provider}); those days are excluded from the water "
+                "balance rather than assumed to be zero."
+            )
+        else:
+            all_warnings_weather_gap = None
+    else:
+        all_warnings_weather_gap = None
+
+    # Always use the field's real, complete polygon — never a centroid or
+    # an arbitrary bounding box (fixture mode ignores this argument).
     satellite_series = satellite_provider.get_index_timeseries_for_range(
-        {}, history_start, analysis_date
+        field.geojson_polygon, history_start, analysis_date
     )
     sat_observation_inputs = [
         SatelliteObservationInput(
@@ -274,6 +291,15 @@ def analyze_field(
             ndvi_p50=obs.ndvi.p50,
         )
         for obs in satellite_series.observations
+        # Provider-layer quality gate: corrupt/non-physical/cloud-blotted
+        # observations never reach the domain trend-adjustment logic at
+        # all. "stale"/"low_valid_pixel_ratio" observations ARE passed
+        # through — the domain layer (satellite_adjustment.py) already has
+        # its own, more nuanced freshness/pixel-ratio thresholds and is
+        # designed to react to them (lower confidence, skip adjustment)
+        # rather than being pre-filtered on the same two dimensions twice.
+        if obs.quality_status
+        not in {"cloud_contaminated", "no_data", "malformed_response", "non_finite_values"}
     ]
 
     init_result = determine_initialization(
@@ -291,6 +317,8 @@ def analyze_field(
     )
 
     all_warnings: list[str] = list(crop_stage_result.warnings) + list(init_result.warnings)
+    if all_warnings_weather_gap:
+        all_warnings.append(all_warnings_weather_gap)
 
     forecast_precip_mm = 0.0
     daily_rows_schema: list[DailyWaterBalanceRowSchema] = []
@@ -470,6 +498,15 @@ def analyze_field(
         total_precipitation_mm=sum(row.precipitation_mm for row in daily_rows_schema),
         forecast_precipitation_mm=forecast_precip_mm,
         forecast_window_hours=rec_defaults.forecast_rain.window_hours,
+        provider=weather_series.provider,
+        source=weather_series.source,
+        retrieved_at=weather_series.retrieved_at,
+        cache_hit=weather_series.cache_hit,
+        missing_dates=weather_series.coverage.missing_dates if weather_series.coverage else [],
+        coverage_ratio=weather_series.coverage.coverage_ratio if weather_series.coverage else 1.0,
+        completeness_status=(
+            weather_series.coverage.completeness_status if weather_series.coverage else "complete"
+        ),
     )
     satellite_summary_schema = SatelliteSummary(
         data_mode=settings.data_mode.value,
@@ -482,6 +519,11 @@ def analyze_field(
         adjustment_applied=satellite_result.applied,
         adjustment_mm=satellite_result.adjustment_mm,
         reasons=satellite_result.reasons,
+        provider=satellite_series.provider,
+        source=satellite_series.source,
+        retrieved_at=satellite_series.retrieved_at,
+        cache_hit=satellite_series.cache_hit,
+        rejected_acquisitions_count=len(satellite_series.rejected_acquisitions),
     )
     water_balance_summary_schema = WaterBalanceSummary(
         initialization=initialization_schema,

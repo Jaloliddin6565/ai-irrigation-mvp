@@ -61,6 +61,17 @@ class WeatherSummary(BaseModel):
     total_precipitation_mm: float
     forecast_precipitation_mm: float
     forecast_window_hours: int
+    # Provider provenance (live mode: "open-meteo"; fixture mode: "fixture").
+    provider: str = "fixture"
+    source: str = "DEMO / FIXTURE DATA"
+    retrieved_at: datetime | None = None
+    cache_hit: bool = False
+    # Raw provider coverage over the requested range, independent of the
+    # water-balance day count above — see docs/methodology.md "Weather gap
+    # handling". Missing dates are never converted to zero values.
+    missing_dates: list[date] = Field(default_factory=list)
+    coverage_ratio: float = 1.0
+    completeness_status: str = "complete"
 
 
 class SatelliteSummary(BaseModel):
@@ -76,6 +87,15 @@ class SatelliteSummary(BaseModel):
     adjustment_applied: bool
     adjustment_mm: float
     reasons: list[str] = Field(default_factory=list)
+    # Provider provenance (live mode: "cdse-sentinel-hub"; fixture mode:
+    # "fixture") and how many candidate acquisitions were excluded before
+    # any observation reached the trend-adjustment logic above (stale
+    # scenes, low valid-pixel ratio, cloud cover over threshold, etc).
+    provider: str = "fixture"
+    source: str = "DEMO / FIXTURE DATA"
+    retrieved_at: datetime | None = None
+    cache_hit: bool = False
+    rejected_acquisitions_count: int = 0
 
 
 class DailyWaterBalanceRowSchema(BaseModel):
@@ -187,11 +207,21 @@ class AnalysisListResponse(BaseModel):
 class SatelliteTimeseriesResponse(BaseModel):
     field_id: int
     data_mode: str
+    provider: str = "fixture"
+    source: str = "DEMO / FIXTURE DATA"
+    retrieved_at: datetime | None = None
+    cache_hit: bool = False
+    rejected_acquisitions: list[dict[str, Any]] = Field(default_factory=list)
     observations: list[dict[str, Any]]
 
 
 class WeatherResponse(BaseModel):
     field_id: int
     data_mode: str
+    provider: str = "fixture"
+    source: str = "DEMO / FIXTURE DATA"
+    retrieved_at: datetime | None = None
+    cache_hit: bool = False
+    coverage: dict[str, Any] | None = None
     timezone: str
     days: list[dict[str, Any]]
