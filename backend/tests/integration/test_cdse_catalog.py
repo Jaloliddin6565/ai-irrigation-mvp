@@ -229,13 +229,13 @@ async def test_results_are_sorted_chronologically() -> None:
 
 @respx.mock
 async def test_pagination_follows_the_next_link() -> None:
-    # respx matches routes by host+path (ignoring the query string) unless
-    # told otherwise, so a distinctly-queried "next" URL on the same path
-    # would be matched by whichever route registered first — use a single
-    # route with an ordered side_effect instead, which exercises the same
-    # "follow next, stop when absent" logic without that test-harness
-    # ambiguity. The href pointing back at the same URL is realistic if the
-    # real API paginates via an opaque cursor rather than a distinct path.
+    # The real CDSE Catalog API's "next" link (verified live during
+    # Phase 4.5) points back at the *same* URL and carries an opaque
+    # cursor fragment in link.body that must be merged into the original
+    # request body — it is not a distinctly-queried follow-up URL. This
+    # mock reproduces that exact, sanitized shape (real example observed:
+    # {"rel": "next", "href": "<same url>", "method": "POST",
+    # "body": {"next": "2"}, "merge": true}).
     _mock_token()
     route = respx.post(CATALOG_URL)
     route.side_effect = [
@@ -243,7 +243,16 @@ async def test_pagination_follows_the_next_link() -> None:
             200,
             json={
                 "features": [_feature("S1", "2026-06-01T07:00:00Z", 10.0)],
-                "links": [{"rel": "next", "href": CATALOG_URL}],
+                "links": [
+                    {
+                        "href": CATALOG_URL,
+                        "rel": "next",
+                        "method": "POST",
+                        "body": {"next": "2"},
+                        "merge": True,
+                    }
+                ],
+                "context": {"next": "2", "limit": 1, "returned": 1},
             },
         ),
         httpx.Response(
@@ -258,6 +267,42 @@ async def test_pagination_follows_the_next_link() -> None:
     )
     assert {a.scene_id for a in result.accepted} == {"S1", "S2"}
     assert route.call_count == 2
+
+
+@respx.mock
+async def test_pagination_merges_the_cursor_into_the_original_request_body() -> None:
+    _mock_token()
+    route = respx.post(CATALOG_URL)
+    route.side_effect = [
+        httpx.Response(
+            200,
+            json={
+                "features": [_feature("S1", "2026-06-01T07:00:00Z", 10.0)],
+                "links": [
+                    {
+                        "href": CATALOG_URL,
+                        "rel": "next",
+                        "method": "POST",
+                        "body": {"next": "2"},
+                        "merge": True,
+                    }
+                ],
+            },
+        ),
+        httpx.Response(200, json={"features": [], "links": []}),
+    ]
+    await _catalog_client().search(
+        VALID_POLYGON,
+        start_date=date(2026, 5, 1),
+        end_date=date(2026, 6, 30),
+        max_cloud_cover_pct=80.0,
+    )
+    second_request_body = _json.loads(route.calls[1].request.content)
+    # The cursor is merged in ...
+    assert second_request_body["next"] == "2"
+    # ... alongside the *original* search parameters, not replacing them.
+    assert second_request_body["intersects"] == VALID_POLYGON
+    assert second_request_body["collections"] == ["sentinel-2-l2a"]
 
 
 @respx.mock

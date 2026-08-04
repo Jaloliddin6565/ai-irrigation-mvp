@@ -7,6 +7,16 @@ the field really looks like. Never fabricates an acquisition date: every
 `AcquisitionRecord` this module returns carries the provider's own reported
 datetime, and an acquisition over the configured cloud-cover threshold is
 recorded as rejected (with a reason) rather than silently dropped.
+
+Pagination (verified live during Phase 4.5): the real CDSE Catalog API's
+`links` "next" entry is not a distinctly-queried follow-up URL — it is an
+opaque cursor fragment (e.g. `{"next": "2"}`) that must be merged into the
+*original* request body (`"merge": true`) and POSTed back to the same
+`href`. `_next_page_link` returns the whole link object so `search()` can
+apply that merge; a page limit of 100 in normal use means most searches
+never actually paginate (a single field's Sentinel-2 revisit history over
+the ~90-day lookback window is well under 100 scenes), but the mechanism
+is exercised and confirmed correct.
 """
 
 import logging
@@ -114,6 +124,7 @@ class CdseCatalogClient:
         accepted: dict[str, AcquisitionRecord] = {}
         rejected: list[RejectedAcquisitionRecord] = []
         url: str | None = self._catalog_url
+        method = "POST"
         body: dict | None = request_body
 
         async with RetryingHttpClient(
@@ -127,7 +138,7 @@ class CdseCatalogClient:
                 if url is None:
                     break
                 response = await self._token_client.request_with_auth(
-                    client, "POST", url, json=body
+                    client, method, url, json=body
                 )
                 if response.status_code != 200:
                     raise ProviderMalformedResponseError(
@@ -172,8 +183,26 @@ class CdseCatalogClient:
                     key = record.scene_id or record.acquisition_datetime.isoformat()
                     accepted[key] = record
 
-                url = self._next_page_url(payload)
-                body = None  # "next" links are already fully-formed GET/POST targets
+                next_link = self._next_page_link(payload)
+                if next_link is None:
+                    url = None
+                    continue
+                url = next_link["href"]
+                method = next_link.get("method") or "POST"
+                # The real CDSE Catalog API paginates via an opaque cursor
+                # merged into the *original* request body (e.g.
+                # {"next": "2"}), not a distinctly-queried follow-up URL —
+                # discovered during the Phase 4.5 live connectivity check.
+                # `merge: true` means "merge this fragment into the request
+                # that produced this page"; anything else replaces it
+                # wholesale (defensive fallback, not observed live).
+                cursor_fragment = next_link.get("body")
+                if next_link.get("merge") and isinstance(cursor_fragment, dict):
+                    body = {**request_body, **cursor_fragment}
+                elif isinstance(cursor_fragment, dict):
+                    body = cursor_fragment
+                else:
+                    body = request_body
 
         sorted_accepted = sorted(accepted.values(), key=lambda r: r.acquisition_datetime)
         return CatalogSearchResult(accepted=sorted_accepted, rejected=rejected)
@@ -206,7 +235,7 @@ class CdseCatalogClient:
             collection=COLLECTION,
         )
 
-    def _next_page_url(self, payload: dict) -> str | None:
+    def _next_page_link(self, payload: dict) -> dict | None:
         links = payload.get("links")
         if not isinstance(links, list):
             return None
@@ -214,5 +243,5 @@ class CdseCatalogClient:
             if isinstance(link, dict) and link.get("rel") == "next":
                 href = link.get("href")
                 if isinstance(href, str) and href:
-                    return href
+                    return link
         return None
