@@ -39,10 +39,12 @@ implementations the composition root wires up. Application code in
   and reported in `coverage.missing_dates`, never zero-filled.
 - Implemented and covered by respx-mocked tests
   (`backend/tests/integration/test_live_mode_analysis.py` and the
-  provider-level test files alongside it). Real live connectivity has not
-  been exercised — see `backend/scripts/live_smoke_test.py`, which requires
-  a separate, explicit, manually-run approval step. Never exercised in CI
-  under any circumstance.
+  provider-level test files alongside it). Real connectivity was verified
+  once (Phase 4.5, `backend/scripts/live_smoke_test.py`, a small Uzbekistan
+  test polygon) — Open-Meteo, CDSE OAuth/Catalog/Statistical API, real
+  acquisition dates, and all six spectral indices confirmed working; see
+  docs/methodology.md "Known limitations" for what that check did and did
+  not cover. Never exercised in CI under any circumstance.
 - Provider responses are cached in-memory (`WEATHER_CACHE_TTL_SECONDS`/
   `SATELLITE_CACHE_TTL_SECONDS`) and outbound HTTP uses bounded
   exponential-backoff retries only on transient failures (429/5xx/timeout/

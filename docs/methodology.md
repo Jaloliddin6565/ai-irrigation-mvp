@@ -311,14 +311,23 @@ repeated here deliberately.
 
 ## Known limitations
 
-- Live Sentinel-2/Open-Meteo connectivity is implemented and covered by
-  mocked tests only — a real live-credential smoke test
-  (`backend/scripts/live_smoke_test.py`) has not been run yet and requires
-  separate explicit approval (see CLAUDE.md "Data modes").
-- The Statistical API response parser (`app/providers/satellite/
-  statistics.py`) is modelled on Sentinel Hub's documented response shape;
-  exact field names should be re-verified against a real response during
-  that future live smoke test.
+- Live Sentinel-2/Open-Meteo connectivity has been verified against the
+  real APIs (Phase 4.5, `backend/scripts/live_smoke_test.py`, small
+  Uzbekistan test polygon): Open-Meteo forecast + archive, CDSE OAuth +
+  token caching, Catalog acquisition search (real dates, real pagination
+  cursor), and Statistical API parcel statistics (all six indices,
+  physically plausible values) all confirmed working end to end. This was
+  a single connectivity check against one small test field, not a
+  systematic validation across varied geometries, cloud conditions, or
+  seasons.
+- The Statistical API evalscript required two corrections discovered only
+  by testing live (see `app/providers/satellite/statistics.py` docstring):
+  bands must be requested as plain DN (digital number) names, not
+  per-band `{name, units}` objects, with reflectance computed in-script by
+  dividing by the standard 10000 DN scale factor; the response *parsing*
+  shape (`interval.from/to`, `outputs.<index>.bands.B0.stats.{...,
+  percentiles}`) needed no correction — it matched what was already
+  implemented.
 - Bare-soil evaporation pre-planting isn't modelled (Kc = 0).
 - A missing weather day is treated as a ETc/precipitation no-op, which can
   understate depletion across data gaps.

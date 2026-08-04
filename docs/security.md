@@ -73,12 +73,15 @@ be read as a security control against an untrusted caller.
 
 ## Live-credential handling status
 
-Live-mode provider code exists and is covered by respx-mocked tests, but
-**no request has ever been made with real CDSE/Open-Meteo credentials**.
-`backend/scripts/live_smoke_test.py` is the documented, explicitly-manual
-path for that first real connectivity check — it reads credentials only
-from a local, untracked `.env`, never prints a secret or token, and is
-never invoked automatically (not from CI, not from any application code).
+A real live-credential connectivity check (Phase 4.5) has been performed
+using `backend/scripts/live_smoke_test.py` and direct provider calls
+against real Open-Meteo and CDSE endpoints, from a local, untracked `.env`.
+Confirmed during that check: the CDSE client secret and access token were
+never printed, logged, or persisted at any point; `.env` remained
+git-ignored and untracked throughout. This was a single operator-run check
+under the security rules above, not a standing or repeated arrangement —
+future live requests (including any CI use) remain out of scope, and
+CI never references real provider credentials.
 
 ## What's intentionally deferred
 
