@@ -6,17 +6,27 @@ import { ApiError, NetworkUnavailableError } from "../../api/client";
 import { ApiErrorPanel } from "./ApiErrorPanel";
 
 describe("ApiErrorPanel", () => {
-  it("shows a friendly message for a known structured backend error code", () => {
+  it("shows the backend's own specific message, not a generic overlay", () => {
+    // The backend computes case-specific detail (e.g. exactly which limit a
+    // polygon's area exceeded) — the panel must show that, not a static
+    // generic translation keyed only on the error code.
     render(
       <ApiErrorPanel
-        error={new ApiError(404, { code: "field_not_found", message_uz: "Dala topilmadi (raw)." })}
+        error={
+          new ApiError(422, {
+            code: "invalid_geometry",
+            message_uz: "Poligon maydoni (620.00 ga) ruxsat etilgan maksimal maydondan (500 ga) katta.",
+          })
+        }
       />
     );
 
-    expect(screen.getByText("Dala topilmadi.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Poligon maydoni (620.00 ga) ruxsat etilgan maksimal maydondan (500 ga) katta.")
+    ).toBeInTheDocument();
   });
 
-  it("falls back to the raw backend message for an unrecognized code, never a stack trace", () => {
+  it("shows the raw backend message for an unrecognized code too, never a stack trace", () => {
     render(
       <ApiErrorPanel
         error={new ApiError(400, { code: "some_new_code", message_uz: "Yangi xatolik turi." })}
