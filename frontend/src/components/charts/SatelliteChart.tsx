@@ -67,7 +67,11 @@ export function SatelliteChart({ observations }: { observations: ParcelObservati
       </div>
       <p className="field-hint">{t(`charts.indexExplainer.${index}`)}</p>
 
-      <div className="chart-wrap">
+      <div
+        className="chart-wrap"
+        role="img"
+        aria-label={t("charts.satelliteAriaLabel", { index: t(`charts.index.${index}`) })}
+      >
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={points} margin={{ left: 8, right: 16, top: 16, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -121,6 +125,32 @@ export function SatelliteChart({ observations }: { observations: ParcelObservati
           </ResponsiveContainer>
         </div>
       ) : null}
+
+      <details className="chart-data-table">
+        <summary>{t("charts.viewAsTable")}</summary>
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{t("analysisHistory.date")}</th>
+                <th>{t(`charts.index.${index}`)} (p50)</th>
+                <th>{t("charts.validPixelRatio")}</th>
+                <th>{t("charts.qualityStatus")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {points.map((point) => (
+                <tr key={point.date}>
+                  <td>{formatDate(point.date)}</td>
+                  <td>{point.p50.toFixed(3)}</td>
+                  <td>{formatPercent(point.validPixelRatio)}</td>
+                  <td>{t(`satellite.observationQuality.${point.qualityStatus}`)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

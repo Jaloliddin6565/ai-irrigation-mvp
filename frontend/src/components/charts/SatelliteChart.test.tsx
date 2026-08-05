@@ -47,4 +47,18 @@ describe("SatelliteChart", () => {
     expect(screen.getByRole("button", { name: "NDVI" })).toBeInTheDocument();
     expect(screen.getByText("Sifat bo'yicha belgilangan kuzatuvlar")).toBeInTheDocument();
   });
+
+  it("provides an accessible tabular alternative to the visual chart", () => {
+    render(
+      <SatelliteChart
+        observations={[observation({ acquisition_date: "2026-05-01" })]}
+      />
+    );
+
+    expect(screen.getByRole("img", { name: /NDVI/ })).toBeInTheDocument();
+    expect(
+      screen.getByText("Ma'lumotlarni jadval ko'rinishida ko'rish")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
 });

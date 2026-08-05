@@ -34,7 +34,7 @@ export function WeatherChart({ days }: { days: DailyWeather[] }) {
   }
 
   return (
-    <div className="chart-wrap">
+    <div className="chart-wrap" role="img" aria-label={t("charts.weatherAriaLabel")}>
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={data} margin={{ left: 8, right: 16, top: 16, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -89,6 +89,34 @@ export function WeatherChart({ days }: { days: DailyWeather[] }) {
         </ComposedChart>
       </ResponsiveContainer>
       <p className="field-hint">{t("charts.forecastDashedNotice")}</p>
+
+      <details className="chart-data-table">
+        <summary>{t("charts.viewAsTable")}</summary>
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{t("analysisHistory.date")}</th>
+                <th>{t("charts.precipitation")}</th>
+                <th>ET0 (mm)</th>
+                <th>{t("charts.tempMax")}</th>
+                <th>{t("charts.tempMin")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((day) => (
+                <tr key={day.date}>
+                  <td>{formatDate(day.date)}</td>
+                  <td>{day.precipitation.toFixed(1)}</td>
+                  <td>{(day.historicalEt0 ?? day.forecastEt0 ?? 0).toFixed(1)}</td>
+                  <td>{day.tempMax.toFixed(1)}</td>
+                  <td>{day.tempMin.toFixed(1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

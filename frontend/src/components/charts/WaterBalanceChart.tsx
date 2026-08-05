@@ -36,7 +36,7 @@ export function WaterBalanceChart({ rows }: { rows: DailyWaterBalanceRow[] }) {
   }
 
   return (
-    <div className="chart-wrap">
+    <div className="chart-wrap" role="img" aria-label={t("charts.waterBalanceAriaLabel")}>
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={data} margin={{ left: 8, right: 16, top: 16, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -71,6 +71,34 @@ export function WaterBalanceChart({ rows }: { rows: DailyWaterBalanceRow[] }) {
         </ComposedChart>
       </ResponsiveContainer>
       <p className="field-hint">{t("charts.waterBalanceExplainer")}</p>
+
+      <details className="chart-data-table">
+        <summary>{t("charts.viewAsTable")}</summary>
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{t("analysisHistory.date")}</th>
+                <th>{t("charts.depletion")}</th>
+                <th>RAW (mm)</th>
+                <th>{t("charts.precipitation")}</th>
+                <th>{t("charts.irrigationEvents")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.date}>
+                  <td>{formatDate(row.date)}</td>
+                  <td>{row.depletion.toFixed(1)}</td>
+                  <td>{row.raw.toFixed(1)}</td>
+                  <td>{row.precipitation.toFixed(1)}</td>
+                  <td>{row.irrigation.toFixed(1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

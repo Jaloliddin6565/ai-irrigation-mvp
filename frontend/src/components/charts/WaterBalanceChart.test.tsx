@@ -42,4 +42,11 @@ describe("WaterBalanceChart", () => {
       )
     ).toBeInTheDocument();
   });
+
+  it("provides an accessible tabular alternative to the visual chart", () => {
+    render(<WaterBalanceChart rows={[row({ date: "2026-05-01" })]} />);
+
+    expect(screen.getByRole("img", { name: /namlik kamayishi/ })).toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
 });

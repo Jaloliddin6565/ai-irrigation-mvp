@@ -69,38 +69,86 @@ export function FarmerRegisterPage() {
       <form className="card" onSubmit={onSubmit} noValidate>
         <div className="field">
           <label htmlFor="full_name">{t("farmer.fullName")}</label>
-          <input id="full_name" autoComplete="name" {...register("full_name")} />
+          <input
+            id="full_name"
+            autoComplete="name"
+            aria-invalid={errors.full_name ? true : undefined}
+            aria-describedby={errors.full_name ? "full_name-error" : undefined}
+            {...register("full_name")}
+          />
           {errors.full_name ? (
-            <span className="field-error">{t("farmer.errors.fullName")}</span>
+            <span id="full_name-error" className="field-error">
+              {t("farmer.errors.fullName")}
+            </span>
           ) : null}
         </div>
 
         <div className="field">
           <label htmlFor="phone">{t("farmer.phone")}</label>
-          <input id="phone" autoComplete="tel" placeholder="+998901234567" {...register("phone")} />
-          {errors.phone ? <span className="field-error">{t("farmer.errors.phone")}</span> : null}
+          <input
+            id="phone"
+            autoComplete="tel"
+            placeholder="+998901234567"
+            aria-invalid={errors.phone || isPhoneConflict ? true : undefined}
+            aria-describedby={errors.phone || isPhoneConflict ? "phone-error" : undefined}
+            {...register("phone")}
+          />
+          {errors.phone ? (
+            <span id="phone-error" className="field-error">
+              {t("farmer.errors.phone")}
+            </span>
+          ) : null}
           {isPhoneConflict ? (
-            <span className="field-error">{t("farmer.errors.phoneConflict")}</span>
+            <span id="phone-error" className="field-error">
+              {t("farmer.errors.phoneConflict")}
+            </span>
           ) : null}
         </div>
 
         <div className="field">
           <label htmlFor="email">{t("farmer.email")}</label>
-          <input id="email" type="email" autoComplete="email" {...register("email")} />
-          {errors.email ? <span className="field-error">{t("farmer.errors.email")}</span> : null}
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={errors.email ? "email-error" : undefined}
+            {...register("email")}
+          />
+          {errors.email ? (
+            <span id="email-error" className="field-error">
+              {t("farmer.errors.email")}
+            </span>
+          ) : null}
         </div>
 
         <div className="field">
           <label htmlFor="region">{t("farmer.region")}</label>
-          <input id="region" {...register("region")} />
-          {errors.region ? <span className="field-error">{t("farmer.errors.region")}</span> : null}
+          <input
+            id="region"
+            aria-invalid={errors.region ? true : undefined}
+            aria-describedby={errors.region ? "region-error" : undefined}
+            {...register("region")}
+          />
+          {errors.region ? (
+            <span id="region-error" className="field-error">
+              {t("farmer.errors.region")}
+            </span>
+          ) : null}
         </div>
 
         <div className="field">
           <label htmlFor="district">{t("farmer.district")}</label>
-          <input id="district" {...register("district")} />
+          <input
+            id="district"
+            aria-invalid={errors.district ? true : undefined}
+            aria-describedby={errors.district ? "district-error" : undefined}
+            {...register("district")}
+          />
           {errors.district ? (
-            <span className="field-error">{t("farmer.errors.district")}</span>
+            <span id="district-error" className="field-error">
+              {t("farmer.errors.district")}
+            </span>
           ) : null}
         </div>
 

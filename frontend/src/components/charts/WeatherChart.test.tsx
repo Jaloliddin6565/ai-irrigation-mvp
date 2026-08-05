@@ -36,4 +36,11 @@ describe("WeatherChart", () => {
 
     expect(screen.getByText("Uzuq chiziq — prognoz qilingan qiymatlarni bildiradi.")).toBeInTheDocument();
   });
+
+  it("provides an accessible tabular alternative to the visual chart", () => {
+    render(<WeatherChart days={[day({ date: "2026-05-01" })]} />);
+
+    expect(screen.getByRole("img", { name: /Yog'ingarchilik/ })).toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
 });
