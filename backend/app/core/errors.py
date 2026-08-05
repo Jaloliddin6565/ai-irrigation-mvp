@@ -11,6 +11,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.types import ASGIApp
 
 logger = logging.getLogger("app.errors")
 
@@ -82,8 +84,7 @@ async def validation_error_handler(_request: Request, exc: RequestValidationErro
     )
 
 
-async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled exception", exc_info=exc)
+def _internal_error_response() -> JSONResponse:
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=jsonable_encoder(
@@ -94,3 +95,28 @@ async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSON
             )
         ),
     )
+
+
+class UnhandledExceptionMiddleware(BaseHTTPMiddleware):
+    """Turns any exception that escapes routing/AppError/validation handling
+    into the same structured 500 body as every other error response.
+
+    This is deliberately a middleware, not `@app.exception_handler(Exception)`.
+    Starlette promotes a handler registered for the bare `Exception` type to
+    `ServerErrorMiddleware`, which FastAPI always places *outside* every
+    middleware added via `add_middleware` (including CORSMiddleware) — so a
+    JSONResponse built there never gets a CORS header, and the browser's
+    fetch() call sees an opaque network failure instead of the actual 500
+    body. A normal middleware sits inside that stack, so CORSMiddleware
+    (added after this one in app/main.py) still applies its headers here.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        super().__init__(app)
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> JSONResponse:
+        try:
+            return await call_next(request)  # type: ignore[return-value]
+        except Exception as exc:  # noqa: BLE001 - intentional catch-all, see class docstring
+            logger.exception("Unhandled exception", exc_info=exc)
+            return _internal_error_response()

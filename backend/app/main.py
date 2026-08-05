@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import analyses, config_options, farmers, fields, health, irrigations
 from app.core.errors import (
     AppError,
+    UnhandledExceptionMiddleware,
     app_error_handler,
-    unhandled_exception_handler,
     validation_error_handler,
 )
 from app.core.logging import configure_logging
@@ -25,6 +25,14 @@ app = FastAPI(
     ),
 )
 
+# Order matters: UnhandledExceptionMiddleware must be added BEFORE
+# CORSMiddleware so that CORSMiddleware ends up outermost and still applies
+# its headers to the 500 responses this middleware builds. A handler
+# registered via app.add_exception_handler(Exception, ...) would instead be
+# promoted to Starlette's ServerErrorMiddleware, which always sits outside
+# every add_middleware()-registered middleware (including CORS) — see
+# UnhandledExceptionMiddleware's docstring.
+app.add_middleware(UnhandledExceptionMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allowed_origins_list,
@@ -35,7 +43,6 @@ app.add_middleware(
 
 app.add_exception_handler(AppError, app_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]
-app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.include_router(health.router)
 app.include_router(config_options.router)
