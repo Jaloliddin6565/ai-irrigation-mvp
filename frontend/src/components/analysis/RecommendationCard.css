@@ -1,0 +1,40 @@
+.recommendation-card {
+  border-left: 6px solid var(--color-border);
+}
+
+.recommendation-card--good {
+  border-left-color: #3f8f4f;
+}
+
+.recommendation-card--watch {
+  border-left-color: var(--color-warning-border);
+}
+
+.recommendation-card--urgent {
+  border-left-color: var(--color-danger-text);
+}
+
+.recommendation-card--neutral {
+  border-left-color: var(--color-text-muted);
+}
+
+.recommendation-card__status {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin: 0 0 var(--space-3);
+}
+
+.recommendation-card__ranges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.recommendation-card__range-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
