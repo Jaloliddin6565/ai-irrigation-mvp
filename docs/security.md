@@ -21,6 +21,19 @@ separate specifically so a real auth layer can be added later without a
 rewrite — but that layer does not exist yet, and nothing in this MVP should
 be read as a security control against an untrusted caller.
 
+### Frontend "active farmer" — a UX convenience, not identity
+
+`frontend/src/features/farmer/ActiveFarmerContext.tsx` stores the selected
+farmer's id in the browser's `localStorage` (key
+`ai-irrigation.activeFarmerId`) so the SPA remembers who is "current"
+across page loads. This is **not** authentication and must never be
+treated as proof of identity: any browser can set any farmer id and the
+backend will honor it, exactly as described above. `GET /api/farmers?phone=`
+(added in Phase 5, see `docs/api.md`) looks a farmer up by phone number to
+populate this client-side selection — it is a lookup convenience, not a
+credential check. On a shared/kiosk device, anyone with browser access can
+switch the active farmer or read whichever farmer id is currently stored.
+
 ## Secrets
 
 - Real credentials live only in a local, untracked `.env` file.

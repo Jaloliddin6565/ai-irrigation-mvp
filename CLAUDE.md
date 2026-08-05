@@ -91,6 +91,16 @@ and phased roadmap context.
 - `backend/scripts/live_smoke_test.py` — the **only** sanctioned way to make
   a real live-credential request. Never invoked automatically by anything
   (not CI, not application code) — see rule 7 and `docs/deployment.md`.
+- `frontend/src/api/` — the **only** place the frontend talks to this
+  backend (typed fetch client, per-resource functions, TanStack Query
+  hooks). Never call Open-Meteo or CDSE directly from the frontend, never
+  add a `VITE_`-prefixed credential/secret variable — see rule 7 and
+  `docs/architecture.md` "Frontend". `frontend/src/noSecretsInFrontend.test.ts`
+  enforces this automatically.
+- `frontend/src/features/farmer/ActiveFarmerContext.tsx` — the trusted-MVP
+  "active farmer id" (React state + `localStorage`). This is a UX
+  convenience, not authentication — never treat it as identity or a
+  security boundary in frontend code; see rule 6 and `docs/security.md`.
 
 ## Persistent in-app disclaimer
 

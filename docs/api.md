@@ -1,10 +1,11 @@
 # API reference
 
-Status: Phase 4 — farmer/field/irrigation CRUD, the full analysis
-pipeline, and live Open-Meteo/CDSE Sentinel Hub providers behind
-`DATA_MODE=live` (no authentication — see `docs/security.md`). Interactive
-docs are always available at `/docs` (Swagger UI) and `/redoc` when the
-backend is running.
+Status: Phase 5 — farmer/field/irrigation CRUD, the full analysis
+pipeline, live Open-Meteo/CDSE Sentinel Hub providers behind
+`DATA_MODE=live`, and a complete frontend against this contract (no
+authentication — see `docs/security.md`). Interactive docs are always
+available at `/docs` (Swagger UI) and `/redoc` when the backend is
+running.
 
 ## CDSE endpoint verification
 
@@ -22,9 +23,10 @@ legacy format (`/api/v1/<service>`) and the new format (`/<service>/v1`,
 used above) work with no breaking change during the rollout. Every one of
 these URLs is a `Settings` field (`CDSE_TOKEN_URL`, `CDSE_CATALOG_URL`,
 `CDSE_STATISTICS_URL`, `CDSE_PROCESS_URL`) — a future path change is a
-config edit, not a code change. Re-verify this list before the first real
-live-credential smoke test (`backend/scripts/live_smoke_test.py`), since it
-has not been exercised against the real API yet.
+config edit, not a code change. This list was re-verified live once during
+the Phase 4.5 connectivity check (`backend/scripts/live_smoke_test.py` and
+direct provider calls) — see `docs/security.md` "Live-credential handling
+status" for what that check covered.
 
 Open-Meteo requires no API key for non-commercial use;
 `OPEN_METEO_ARCHIVE_URL`/`OPEN_METEO_FORECAST_URL` are likewise
@@ -74,8 +76,16 @@ GET /api/farmers/{farmer_id}
 ```
 `200` + farmer, or `404 farmer_not_found`.
 
-*(No farmer list/update/delete endpoint in this MVP — out of the approved
-Phase 2 scope.)*
+```
+GET /api/farmers?phone=
+```
+Look up a farmer by their exact, already-validated phone number. `200` +
+farmer, or `404 farmer_not_found` if no farmer has that phone number;
+`422` if `phone` doesn't match the same pattern `POST /api/farmers`
+validates. Added in Phase 5 so the frontend's trusted-MVP "select an
+existing farmer" flow (`docs/architecture.md` "Frontend") has a lookup
+mechanism — there is still no farmer *list* endpoint, and no update/delete
+endpoint, both out of the approved MVP scope.
 
 ## Fields
 

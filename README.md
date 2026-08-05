@@ -38,12 +38,18 @@ initialization strategy, conservative satellite qualification, and a
 range-based irrigation recommendation with an explainable confidence
 score — see `docs/methodology.md` and `docs/api.md`. Live Open-Meteo and
 CDSE Sentinel Hub providers (Phase 4) are implemented behind the same
-provider interfaces and covered by mocked tests, but have **not** been
-exercised against real credentials yet — that is a separate, explicitly
-manual step (`backend/scripts/live_smoke_test.py`, see `docs/deployment.md`
-and `docs/security.md`). `DATA_MODE=fixture` remains the default and the
-only mode CI ever runs. `main` only carries the secure foundation; all
-application work happens on feature branches and lands via pull request.
+provider interfaces and covered by mocked tests; real connectivity was
+verified once against live credentials in a single, narrowly-scoped
+operator check (Phase 4.5 — see `docs/security.md` "Live-credential
+handling status"), not repeated or continuous. The complete Uzbek-first
+frontend workflow (Phase 5) — farmer registration/selection, field
+creation with a Leaflet polygon editor, irrigation logging, analysis
+launch, recommendation/confidence/data-source display, and satellite/
+weather/water-balance charts — is implemented against this backend for
+both `fixture` and `live` `DATA_MODE`; see "Frontend" below.
+`DATA_MODE=fixture` remains the default and the only mode CI ever runs.
+`main` only carries the secure foundation; all application work happens on
+feature branches and lands via pull request.
 
 ## Security posture — read before running anywhere but your own machine
 
@@ -91,6 +97,37 @@ Frontend:
 cd frontend
 npm install
 npm run dev
+```
+
+Then open `http://localhost:5173`. With the backend running in
+`DATA_MODE=fixture`, the golden path is: land on `/`, register a farmer
+(`/farmers/new`) or select an existing one by phone (`/farmers/select`),
+add a field with a drawn polygon (`/fields/new`), optionally log an
+irrigation event, then run an analysis (`/fields/:fieldId/analysis`) to see
+the recommendation, confidence, data-source panel, and charts. Every
+fixture-mode screen is labelled `DEMO / NAMUNAVIY MA'LUMOT`.
+
+## Frontend
+
+React + TypeScript (strict) + Vite SPA, React Router, TanStack Query,
+Leaflet + Leaflet-Geoman for the field polygon editor, Recharts for
+satellite/weather/water-balance charts, React Hook Form + Zod for form
+validation. Farmer identity in this MVP is the same trusted, no-auth model
+described above: registering or looking a farmer up by phone stores their
+id in `localStorage` client-side (see `frontend/src/features/farmer/`) —
+this is a UX convenience, not a security boundary, and is documented as
+such in `docs/security.md`. The frontend **never** calls Open-Meteo or
+CDSE directly; every external-data request goes through this backend (see
+`frontend/src/api/`, and the automated regression in
+`frontend/src/noSecretsInFrontend.test.ts`). Frontend environment
+variables (`VITE_API_BASE_URL`, `VITE_MAP_TILE_URL`,
+`VITE_MAP_TILE_ATTRIBUTION`) hold no secrets — see `docs/deployment.md`.
+
+```bash
+cd frontend
+npm run lint     # ESLint
+npm run test      # Vitest + Testing Library, mocked backend only
+npm run build     # tsc --noEmit + production build
 ```
 
 ## Repository layout

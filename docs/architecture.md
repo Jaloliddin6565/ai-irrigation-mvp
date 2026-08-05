@@ -1,14 +1,15 @@
 # Architecture
 
-Status: Phase 4 complete. Farmer/Field/IrrigationEvent CRUD, GeoJSON polygon
+Status: Phase 5 complete. Farmer/Field/IrrigationEvent CRUD, GeoJSON polygon
 validation, the full deterministic analysis pipeline (crop stage → water
 balance → initialization → satellite qualification → recommendation →
-confidence → persistence), and live Open-Meteo/CDSE Sentinel Hub providers
-behind the same provider interfaces are implemented and tested — see
-docs/methodology.md for the calculations and docs/api.md for the endpoint
-contract. Real live connectivity has **not** been exercised yet (that is a
-separately-approved smoke test, see `backend/scripts/live_smoke_test.py`);
-everything here is verified against respx-mocked HTTP.
+confidence → persistence), live Open-Meteo/CDSE Sentinel Hub providers
+behind the same provider interfaces, and a complete frontend workflow
+against this API are implemented and tested — see docs/methodology.md for
+the calculations, docs/api.md for the endpoint contract, and "Frontend"
+below. Real live connectivity was verified once (Phase 4.5, a single
+narrowly-scoped operator check — see docs/security.md); everything else is
+verified against respx-mocked HTTP (backend) or a mocked fetch (frontend).
 
 ## Monorepo layout
 
@@ -216,10 +217,59 @@ and is verified to upgrade/downgrade cleanly on an empty database.
 
 ## Frontend
 
-React + TypeScript + Vite SPA. `react-i18next` with Uzbek as the only
-complete locale; `ru`/`en` resource files exist with a handful of keys and
-fall back to Uzbek for anything not yet translated (see
-`frontend/src/i18n/`). TanStack Query is the server-state layer once pages
-start calling the API (Phase 5). A `DataModeBadge` component makes the
+Status: Phase 5 complete. React + TypeScript (strict) + Vite SPA.
+`react-i18next` with Uzbek as the only complete locale; `ru`/`en` resource
+files hold a partial subset of keys and fall back to Uzbek for anything not
+yet translated (see `frontend/src/i18n/`). TanStack Query is the server-
+state layer for every backend call. A `DataModeBadge` component — always
+driven by a real backend value (`GET /health`'s `data_mode`, or an
+`Analysis`'s own `data_mode`), never a static client env var — makes the
 active `DATA_MODE` visible on every screen so fixture/demo output is never
 mistaken for a live result.
+
+```
+frontend/src/
+  api/          Typed fetch client (client.ts), per-resource functions
+                (resources.ts), TanStack Query hooks (hooks.ts). The only
+                place that talks to this backend; never calls Open-Meteo/
+                CDSE directly (enforced by noSecretsInFrontend.test.ts).
+  types/api.ts  TypeScript types mirroring backend/app/schemas/*.py
+                field-for-field.
+  features/
+    farmer/     ActiveFarmerContext — the trusted-MVP "active farmer id"
+                held in React state + localStorage (a UX convenience, not
+                auth — see docs/security.md), and RequireFarmer, a route
+                guard that redirects to farmer selection when unset.
+    field/      FieldForm — the shared create/edit form (React Hook Form +
+                Zod), used by both FieldNewPage and FieldEditPage.
+    analysis/   AnalysisLauncher (triggers POST /analyze, abortable via
+                AbortController, disabled while pending) and
+                AnalysisResultView (composes the recommendation/confidence/
+                data-source cards with the satellite/weather/water-balance
+                charts for a given Analysis).
+  components/
+    map/        PolygonEditor (Leaflet + Leaflet-Geoman draw/edit/delete,
+                exactly one field polygon at a time, preliminary
+                client-side area via a simple equirectangular-projection
+                shoelace estimate — the backend always recomputes the
+                authoritative area) and FieldMap (read-only display).
+    charts/     Recharts-based SatelliteChart/WeatherChart/
+                WaterBalanceChart — real dates on the x-axis, gaps stay
+                visible, non-usable satellite observations are flagged
+                rather than hidden.
+    analysis/   RecommendationCard, ConfidenceCard, DataSourcePanel.
+    feedback/   ApiErrorPanel (renders the backend's structured {code,
+                message_uz} error, never a raw response body or stack
+                trace) and Loading/EmptyState.
+  pages/        One component per route (see the route table in
+                docs/api.md's frontend section, or App.tsx).
+  testUtils/    renderAtRoute/renderWithActiveFarmer (QueryClientProvider +
+                MemoryRouter + ActiveFarmerProvider test harness) and
+                fetchMock.ts (installs a route-matching fetch mock — tests
+                never hit a real backend or external service).
+```
+
+The polygon editor is Leaflet/Geoman's native mouse-driven draw UI; it is
+not independently keyboard-operable beyond standard tab/enter focus on its
+toolbar buttons — a known limitation of the underlying library, not
+something this phase re-implemented from scratch.

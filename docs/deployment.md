@@ -58,6 +58,21 @@ requires no external credentials at all and is what CI always runs.
    never invoked by CI, Docker, or application code. See
    `docs/security.md` "Live-credential handling status".
 
+## Frontend quality checks
+
+```bash
+cd frontend
+npm run lint       # ESLint
+npm run test       # Vitest — mocked backend only, never a real network call
+npm run build       # tsc --noEmit, then the production Vite build
+```
+
+`VITE_API_BASE_URL` is the only frontend variable that matters for local
+dev (defaults to `http://localhost:8000` if unset); `VITE_MAP_TILE_URL`/
+`VITE_MAP_TILE_ATTRIBUTION` only change the Leaflet basemap. None of the
+three are secrets, and no `VITE_`-prefixed CDSE/credential variable exists
+or should ever be added — see `docs/security.md`.
+
 ## Docker
 
 `docker-compose.yml` and per-service `Dockerfile`s exist (backend +
