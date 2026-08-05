@@ -3,21 +3,3 @@
   flex-direction: column;
   min-height: 100vh;
 }
-
-.app__header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  border-bottom: 1px solid #ddd;
-}
-
-.app__header h1 {
-  font-size: 1.25rem;
-  margin: 0;
-}
-
-.app__main {
-  flex: 1;
-  padding: 1.5rem 1rem;
-}
