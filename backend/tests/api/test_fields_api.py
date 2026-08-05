@@ -1,4 +1,9 @@
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.db.models.analysis import Analysis
+from app.db.models.irrigation_event import IrrigationEvent
 
 VALID_POLYGON = {
     "type": "Polygon",
@@ -195,3 +200,54 @@ def test_delete_field(db_client: TestClient) -> None:
 
     get_response = db_client.get(f"/api/fields/{created['id']}")
     assert get_response.status_code == 404
+
+
+def test_delete_field_cascades_to_irrigation_events_and_analyses(
+    db_client: TestClient, db_session: Session
+) -> None:
+    """A deleted field must not leave orphaned irrigation_events/analyses
+    rows behind (see backend/app/db/models/*.py ondelete=CASCADE + ORM
+    cascade="all, delete-orphan") — verified in Phase 6's database audit."""
+    farmer_id = _create_farmer(db_client)
+    field_id = db_client.post("/api/fields", json=_field_payload(farmer_id)).json()["id"]
+
+    irrigation_response = db_client.post(
+        f"/api/fields/{field_id}/irrigations",
+        json={
+            "occurred_at": "2026-05-01T08:00:00",
+            "amount_mm": 20,
+            "value_source": "farmer_estimate",
+        },
+    )
+    assert irrigation_response.status_code == 201
+
+    analysis_response = db_client.post(
+        f"/api/fields/{field_id}/analyze", json={"analysis_date": "2026-05-02"}
+    )
+    assert analysis_response.status_code == 201
+
+    assert db_session.scalar(
+        select(func.count()).select_from(IrrigationEvent).where(IrrigationEvent.field_id == field_id)
+    ) == 1
+    assert (
+        db_session.scalar(
+            select(func.count()).select_from(Analysis).where(Analysis.field_id == field_id)
+        )
+        == 1
+    )
+
+    delete_response = db_client.delete(f"/api/fields/{field_id}")
+    assert delete_response.status_code == 204
+
+    assert (
+        db_session.scalar(
+            select(func.count()).select_from(IrrigationEvent).where(IrrigationEvent.field_id == field_id)
+        )
+        == 0
+    )
+    assert (
+        db_session.scalar(
+            select(func.count()).select_from(Analysis).where(Analysis.field_id == field_id)
+        )
+        == 0
+    )
