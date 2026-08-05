@@ -1,4 +1,6 @@
-# Confidence scoring weights — GENERIC PLACEHOLDER VALUES.
+# Confidence scoring weights — GENERIC PLACEHOLDER VALUES, not derived from
+# validated Uzbekistan outcome data; MUST be validated against local field
+# trials before being used to drive real irrigation decisions.
 #
 # This produces a 0-1 score from a weighted sum of factor scores (each
 # factor independently scored 0-1 by app/domain/confidence.py), then maps

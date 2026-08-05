@@ -2,8 +2,10 @@
 #
 # "efficiency" scales farmer-reported irrigation amounts down to an
 # estimated effective (root-zone-available) amount in the water balance.
-# Representative textbook ranges, not measured for local infrastructure
-# condition. "unknown" uses a conservative middle default.
+# Representative textbook ranges, NOT measured for Uzbekistan on-farm
+# infrastructure condition. They MUST be validated against local field
+# trials before being used to drive real irrigation decisions.
+# "unknown" uses a conservative middle default.
 
 methodology_version: "0.2.0"
 

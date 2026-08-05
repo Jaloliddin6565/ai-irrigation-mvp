@@ -1,5 +1,8 @@
 # Water-balance engine defaults — GENERIC PLACEHOLDER VALUES.
-# See docs/methodology.md for the full equations these feed into.
+# NOT calibrated for Uzbekistan soils, climate, or on-farm practice; MUST be
+# validated against local field trials before being used to drive real
+# irrigation decisions. See docs/methodology.md for the full equations
+# these feed into.
 
 methodology_version: "0.2.0"
 
