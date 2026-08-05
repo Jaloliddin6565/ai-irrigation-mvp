@@ -1,5 +1,26 @@
 {
   "app.title": "AI Irrigation MVP",
   "dataMode.fixture": "DEMO / FIXTURE DATA",
-  "dataMode.live": "LIVE DATA"
+  "dataMode.live": "LIVE DATA",
+  "disclaimer.text": "This recommendation is a decision-support estimate based on remote data, a weather model, and farmer-provided input. The system does not directly measure soil moisture and does not fully replace the judgement of an agronomist or water-management specialist.",
+
+  "nav.dashboard": "Dashboard",
+  "nav.methodology": "Methodology",
+  "nav.selectFarmer": "Select farmer",
+  "nav.switchFarmer": "Switch farmer",
+
+  "common.loading": "Loading...",
+  "common.saving": "Saving...",
+  "common.cancel": "Cancel",
+  "common.none": "None",
+  "common.yes": "Yes",
+  "common.no": "No",
+  "common.selectOption": "Select...",
+
+  "landing.heroTitle": "A decision-support platform for irrigation, built on satellite, weather, and farmer-provided data",
+  "landing.ctaStart": "Get started",
+  "landing.ctaMethodology": "Methodology",
+
+  "notFound.title": "Page not found",
+  "notFound.backHome": "Back to home"
 }

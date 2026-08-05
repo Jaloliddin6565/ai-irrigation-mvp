@@ -18,3 +18,17 @@
   color: #1c6b32;
   border: 1px solid #9fe0b4;
 }
+
+@media (prefers-color-scheme: dark) {
+  .data-mode-badge--fixture {
+    background: #3a3010;
+    color: #f0d477;
+    border-color: #8a6d1f;
+  }
+
+  .data-mode-badge--live {
+    background: #163a22;
+    color: #8fe0a6;
+    border-color: #2f7a49;
+  }
+}

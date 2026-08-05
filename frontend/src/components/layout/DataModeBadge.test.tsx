@@ -1,24 +1,18 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import "../../i18n";
 import { DataModeBadge } from "./DataModeBadge";
 
 describe("DataModeBadge", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it("defaults to the fixture/demo badge when VITE_DATA_MODE is unset", () => {
-    render(<DataModeBadge />);
+  it("shows the fixture/demo badge for mode=fixture", () => {
+    render(<DataModeBadge mode="fixture" />);
 
     expect(screen.getByText(/DEMO/i)).toBeInTheDocument();
   });
 
-  it("shows the live badge when VITE_DATA_MODE=live", () => {
-    vi.stubEnv("VITE_DATA_MODE", "live");
-
-    render(<DataModeBadge />);
+  it("shows the live badge for mode=live", () => {
+    render(<DataModeBadge mode="live" />);
 
     expect(screen.getByText(/JONLI/i)).toBeInTheDocument();
   });
