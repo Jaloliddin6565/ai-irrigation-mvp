@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.schemas.farmer import FarmerCreate, FarmerRead
+from app.schemas.farmer import PHONE_PATTERN, FarmerCreate, FarmerRead
 from app.services import farmers as farmers_service
 
 router = APIRouter(prefix="/api/farmers", tags=["farmers"])
@@ -16,6 +16,19 @@ router = APIRouter(prefix="/api/farmers", tags=["farmers"])
 )
 def create_farmer(payload: FarmerCreate, db: Session = Depends(get_db)) -> FarmerRead:
     farmer = farmers_service.create_farmer(db, payload)
+    return FarmerRead.model_validate(farmer)
+
+
+@router.get(
+    "",
+    response_model=FarmerRead,
+    summary="Look up a farmer by exact phone number (trusted-MVP profile selection)",
+)
+def get_farmer_by_phone(
+    phone: str = Query(..., pattern=PHONE_PATTERN.pattern),
+    db: Session = Depends(get_db),
+) -> FarmerRead:
+    farmer = farmers_service.get_farmer_by_phone_or_404(db, phone)
     return FarmerRead.model_validate(farmer)
 
 

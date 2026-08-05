@@ -41,3 +41,15 @@ def get_farmer_or_404(db: Session, farmer_id: int) -> Farmer:
             status_code=404,
         )
     return farmer
+
+
+def get_farmer_by_phone_or_404(db: Session, phone: str) -> Farmer:
+    farmer = farmers_repo.get_by_phone(db, phone)
+    if farmer is None:
+        raise AppError(
+            code="farmer_not_found",
+            message_uz="Ushbu telefon raqami bilan fermer topilmadi.",
+            message_en="No farmer found with this phone number.",
+            status_code=404,
+        )
+    return farmer

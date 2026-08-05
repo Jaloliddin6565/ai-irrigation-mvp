@@ -63,3 +63,25 @@ def test_get_missing_farmer_returns_404(db_client: TestClient) -> None:
 
     assert response.status_code == 404
     assert response.json()["code"] == "farmer_not_found"
+
+
+def test_get_farmer_by_phone(db_client: TestClient) -> None:
+    created = db_client.post("/api/farmers", json=FARMER_PAYLOAD).json()
+
+    response = db_client.get("/api/farmers", params={"phone": FARMER_PAYLOAD["phone"]})
+
+    assert response.status_code == 200
+    assert response.json()["id"] == created["id"]
+
+
+def test_get_farmer_by_phone_no_match_returns_404(db_client: TestClient) -> None:
+    response = db_client.get("/api/farmers", params={"phone": "+998900000000"})
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "farmer_not_found"
+
+
+def test_get_farmer_by_invalid_phone_returns_422(db_client: TestClient) -> None:
+    response = db_client.get("/api/farmers", params={"phone": "not-a-phone"})
+
+    assert response.status_code == 422
