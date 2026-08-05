@@ -46,10 +46,18 @@ frontend workflow (Phase 5) — farmer registration/selection, field
 creation with a Leaflet polygon editor, irrigation logging, analysis
 launch, recommendation/confidence/data-source display, and satellite/
 weather/water-balance charts — is implemented against this backend for
-both `fixture` and `live` `DATA_MODE`; see "Frontend" below.
-`DATA_MODE=fixture` remains the default and the only mode CI ever runs.
-`main` only carries the secure foundation; all application work happens on
-feature branches and lands via pull request.
+both `fixture` and `live` `DATA_MODE`; see "Frontend" below. A Phase 6
+final audit (scientific, security, accessibility, error-handling, database,
+and a real live-mode browser walkthrough) found and fixed several
+confirmed defects — a CORS/error-handling ordering bug, an async event-loop
+bug in the CDSE token client, a frontend error-message regression, a
+CSS/code-splitting regression, and three static Docker/CI configuration
+issues — see `docs/validation-plan.md` "Phase 6" for the full list and
+`docs/methodology.md` "Known limitations" for what was found but
+deliberately left as scoped follow-up work. `DATA_MODE=fixture` remains the
+default and the only mode CI ever runs. `main` only carries the secure
+foundation; all application work happens on feature branches and lands via
+pull request.
 
 ## Security posture — read before running anywhere but your own machine
 

@@ -146,6 +146,39 @@ FastAPI wiring). Normalized responses are cached in `core/cache.py`'s
 docstring for the documented future Redis-swap path), keyed on request
 parameters only (coordinates/polygon/date-range), never on credentials.
 
+### Error handling and CORS ordering (`app/core/errors.py`)
+
+`app/main.py` registers `UnhandledExceptionMiddleware` (a normal
+`add_middleware()` middleware) *before* `CORSMiddleware`, not
+`app.add_exception_handler(Exception, ...)`. Found via a Phase 6 live-mode
+walkthrough: Starlette promotes a handler registered for the bare
+`Exception` type to `ServerErrorMiddleware`, which FastAPI always places
+*outside* every `add_middleware()`-registered middleware including CORS —
+so a truly unexpected exception produced a 500 JSON body with no CORS
+header, and the browser's `fetch()` reported it to the frontend as an
+opaque network failure ("backend unreachable") instead of the real,
+structured, Uzbek error message. `AppError` and `RequestValidationError`
+are unaffected (registered via `add_exception_handler` for non-`Exception`
+types, handled by `ExceptionMiddleware`, which sits inside CORS). See
+`backend/tests/api/test_error_handling.py` for the regression coverage.
+
+### Async/sync bridging and the CDSE token lock (`app/providers/satellite/cdse_auth.py`)
+
+`CdseTokenClient` is a process-lifetime singleton
+(`providers/factory.py::_cdse_token_client`, `@lru_cache`), but every
+provider call reaches it through its own `asyncio.run()` (the sync-facade-
+over-async-internals bridging pattern noted above) — a fresh event loop
+every time. An `asyncio.Lock` created once in `__init__` binds to whichever
+loop first awaits it; the *next* `asyncio.run()` call then raises
+`RuntimeError: ... is bound to a different event loop`. Found via a Phase 6
+live-mode walkthrough (fixture-mode tests never exercise two separate
+`asyncio.run()` calls against the same client instance). Fixed by lazily
+recreating the lock whenever the currently-running loop differs from the
+one it was last bound to (`CdseTokenClient._get_lock()`) — see
+`backend/tests/integration/test_cdse_auth.py::test_token_client_survives_reuse_across_separate_asyncio_run_calls`,
+which deliberately calls `asyncio.run()` twice on the same client to
+reproduce it.
+
 ## Analysis orchestration (`app/services/analysis.py`)
 
 `analyze_field()` runs, per request: resolve crop/soil/irrigation-method
@@ -273,3 +306,25 @@ The polygon editor is Leaflet/Geoman's native mouse-driven draw UI; it is
 not independently keyboard-operable beyond standard tab/enter focus on its
 toolbar buttons — a known limitation of the underlying library, not
 something this phase re-implemented from scratch.
+
+### Frontend bundle and code splitting
+
+Every route except the landing page is `React.lazy`-loaded (`App.tsx`),
+wrapped in a single top-level `<Suspense>`. This matters because Leaflet/
+Geoman (the polygon editor) and Recharts (the three chart components) are
+the bulk of the JS: before splitting, the whole app shipped as one
+~1,335 kB chunk (~385 kB gzip) regardless of which page a farmer opened;
+after splitting, the initial/shared chunk is ~351 kB (~110 kB gzip) — a
+~74% reduction — and the map/chart-heavy pages (~430 kB and ~286 kB
+respectively) only download when a user actually visits a field or
+analysis page. A CSS class shared across several page/component CSS files
+but genuinely used across chunks (`.field-summary-card__facts`, used by
+`FieldSummaryCard`, `AnalysisLauncher`, `DataSourcePanel`,
+`FieldDetailsPage`, and `AnalysisResultView`) must live in the always-
+loaded `styles/global.css`, not a page-specific stylesheet — before
+splitting this worked by accident (Vite bundled all CSS into one file
+regardless of which JS chunk needed it); after splitting, a class defined
+only in `DashboardPage.css` silently had no styles applied on any route
+that never happened to load the dashboard chunk first. Found and fixed
+during the Phase 6 bundle-size pass by actually loading a never-visited-
+first lazy route in a browser, not just inspecting the build output.

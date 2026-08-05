@@ -73,13 +73,105 @@ muhtoj bo'lmaydi — ammo hozircha u mavjud emas.
 ## Ma'lumot rejimlari
 
 - `DATA_MODE=fixture` — deterministik statik namuna ma'lumotlar, tashqi
-  hisob ma'lumotlari talab qilinmaydi, interfeysda "DEMO / FIXTURE DATA"
-  sifatida aniq belgilanadi. Bir xil kirish ma'lumotlari doim bir xil
-  natija beradi.
+  hisob ma'lumotlari talab qilinmaydi, interfeysda "DEMO / NAMUNAVIY
+  MA'LUMOT" sifatida aniq belgilanadi. Bir xil kirish ma'lumotlari doim bir
+  xil natija beradi.
 - `DATA_MODE=live` — haqiqiy Sentinel Hub (Copernicus Data Space Ecosystem)
-  va Open-Meteo so'rovlari. Hisob ma'lumotlari yo'q bo'lsa, aniq xato
-  qaytaradi; hech qachon jim ravishda fixture rejimiga o'tmaydi va hech
-  qachon o'rnini bosuvchi soxta ma'lumot yaratmaydi.
+  va Open-Meteo so'rovlari, interfeysda "JONLI MA'LUMOT" sifatida aniq
+  belgilanadi. Sentinel-2 sun'iy yo'ldosh kuzatuvlari va Open-Meteo
+  ob-havo tarixi/bashorati — bular yagona jonli ma'lumot manbalari; hisob
+  ma'lumotlari yo'q bo'lsa, tizim aniq xato qaytaradi, hech qachon jim
+  ravishda fixture rejimiga o'tmaydi va hech qachon o'rnini bosuvchi soxta
+  ma'lumot yaratmaydi.
+
+## Mahalliy ishga tushirish
+
+### Backend (fixture rejimida, standart)
+
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+pip install -e ".[dev]"
+copy ..\.env.example ..\.env    # fayl nomlarini ko'rish uchun; qiymat kiritish shart emas
+alembic upgrade head            # SQLite sxemasini yaratadi
+uvicorn app.main:app --reload
+```
+
+`.env.example` faqat o'zgaruvchi nomlarini ko'rsatadi — haqiqiy qiymatlar
+yo'q. `DATA_MODE=fixture` bo'lsa, `.env` faylida hech narsa to'ldirmasdan
+ham backend to'liq ishlaydi.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+So'ng brauzerda `http://localhost:5173` manzilini oching.
+
+### Test va build buyruqlari
+
+```bash
+# Backend
+cd backend
+pytest                 # to'liq test to'plami
+ruff check .           # kod uslubi
+mypy app                # tip tekshiruvi
+
+# Frontend
+cd frontend
+npm run lint            # ESLint
+npm run test             # Vitest — faqat simulyatsiya qilingan backend
+npm run build             # tsc --noEmit, so'ng production build
+```
+
+### Jonli (live) rejimda ishga tushirish
+
+Jonli rejim haqiqiy CDSE (Copernicus Data Space Ecosystem) hisob
+ma'lumotlarini talab qiladi:
+
+1. Copernicus Data Space Ecosystem hisobingizdan CDSE OAuth mijoz
+   (client ID + secret) oling.
+2. Mahalliy, kuzatuvdan chiqarilgan (git-ignored) `.env` faylida:
+   `DATA_MODE=live`, `CDSE_CLIENT_ID=...`, `CDSE_CLIENT_SECRET=...`
+   qiymatlarini o'rnating. Haqiqiy qiymatlar hech qachon repozitoriyga
+   kiritilmasligi kerak — `.env` doimo `.gitignore` da.
+3. Backend jarayonini qayta ishga tushiring.
+4. Frontend faqat backend bilan gaplashadi — brauzerdan hech qachon
+   to'g'ridan-to'g'ri CDSE yoki Open-Meteo'ga so'rov yubormaydi.
+
+## Dala ish jarayoni (fixture yoki jonli rejimda bir xil)
+
+1. Fermer sifatida ro'yxatdan o'tish yoki telefon raqami bo'yicha mavjud
+   profilni tanlash (`docs/security.md` — bu ishonchga asoslangan holat,
+   haqiqiy autentifikatsiya emas).
+2. Boshqaruv panelidan yangi dala qo'shish, xaritada chegarani chizish.
+3. Ekin turi, ekish sanasi, tuproq va sug'orish usulini kiritish.
+4. Ixtiyoriy: sug'orish voqeasini qayd etish.
+5. Tahlilni ishga tushirish — tavsiya, ishonch darajasi, ma'lumot manbai
+   paneli va sun'iy yo'ldosh/ob-havo/suv balansi grafiklarini ko'rish.
+6. Tahlillar tarixini ko'rish — har bir tahlil alohida saqlanadi, hech
+   qachon almashtirilmaydi.
+
+## Bilingan cheklovlar
+
+- Barcha agronomik qiymatlar (Kc egri chiziqlari, tuproq parametrlari,
+  sug'orish samaradorligi) umumiy FAO-56 uslubidagi namunaviy qiymatlar —
+  O'zbekiston sharoiti uchun kalibrlanmagan. Haqiqiy sug'orish qarorlari
+  uchun ishlatishdan oldin **mahalliy dala sinovlari orqali tasdiqlanishi
+  shart** — qarang `docs/methodology.md`.
+- Tizim hech qachon tuproq namligini, pH darajasini yoki hosildorlikni
+  bevosita o'lchamaydi va kafolatlangan natija va'da qilmaydi.
+- Bu MVPda haqiqiy autentifikatsiya yo'q — faqat mahalliy ishlab chiqish
+  va nazorat qilinadigan pilot loyihalar uchun mo'ljallangan.
+- 6-bosqich yakuniy tekshiruvida aniqlangan qo'shimcha cheklovlar
+  (`docs/methodology.md` "Known limitations", `docs/validation-plan.md`):
+  ba'zi tavsiya sabablari hali inglizcha; katta dalalar uchun jonli
+  Statistik API so'rovi ba'zan xato qaytarishi mumkin; Docker haligacha
+  to'liq sinovdan o'tkazilmagan.
 
 ## Batafsil ma'lumot
 

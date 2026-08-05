@@ -337,3 +337,35 @@ repeated here deliberately.
   soil-moisture percentage.
 - Confidence and recommendation thresholds are configured defaults, not
   derived from validated Uzbekistan outcome data.
+- The `reasons`/`warnings` text produced by `app/domain/recommendation.py`,
+  `satellite_adjustment.py`, `confidence.py`, and `initialization.py` is
+  plain English (and in confidence's case, raw internal factor names like
+  `satellite_freshness`), unlike every user-facing label and structured
+  `message_uz`, which are Uzbek. Found during the Phase 6 live walkthrough:
+  the recommendation/confidence cards render correctly-localized Uzbek
+  headings and static labels, but the dynamic explanatory sentences under
+  them are English. Localizing this text is a real, scoped follow-up (touches
+  several domain files' string generation), not attempted in Phase 6 to
+  avoid rushing changes to scientifically-sensitive calculation code.
+- A second Phase 6 live-mode check (a real ~281 ha field, a ~90-day daily-
+  aggregation lookback window, DATA_MODE=live) hit a genuine CDSE
+  Statistical API `400 Bad Request` that the Phase 4.5 small-test-polygon
+  check never triggered — most likely the API's request-complexity/
+  processing-unit limit for `resx`/`resy: 10` (native Sentinel-2 resolution)
+  combined with a large area and a long `P1D` aggregation window. Not
+  root-caused or fixed live, to keep live external requests minimal per the
+  audit's own constraints; a dedicated, narrowly-scoped live investigation
+  (e.g. coarsening resolution or the aggregation interval for large fields)
+  is needed before this can be considered production-ready for real
+  (non-tiny) Uzbekistan fields in live mode.
+- `GET /api/fields/{id}/satellite-timeseries` and `.../weather` reflect the
+  **current** server `DATA_MODE`, not the `data_mode` recorded on whichever
+  specific `Analysis` the frontend happens to be displaying. In the normal
+  case (a deployment runs in one `DATA_MODE` continuously) this never
+  surfaces; it was only observed by deliberately toggling `DATA_MODE` on a
+  single running process mid-session for the Phase 6 live walkthrough —
+  viewing an old fixture-mode analysis while the server was live triggered
+  fresh live external calls for its charts, decoupled from that analysis's
+  own recorded provenance. Documented as a known characteristic, not fixed,
+  since a real fix (analysis-scoped historical time-series snapshots) is a
+  larger design change than this audit's scope.

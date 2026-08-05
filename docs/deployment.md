@@ -76,10 +76,33 @@ or should ever be added — see `docs/security.md`.
 ## Docker
 
 `docker-compose.yml` and per-service `Dockerfile`s exist (backend +
-frontend) but have not been build-verified in this environment (no local
-Docker available during initial scaffolding — see the original
-implementation plan). Treat them as a starting point to validate, not as
-confirmed-working, before relying on them.
+frontend) but have never been build-verified end-to-end (no local Docker
+available in this environment, either during initial scaffolding or the
+Phase 6 audit — see `docs/validation-plan.md`). A Phase 6 static review
+(read the Dockerfiles/compose file carefully; nothing was actually built or
+run) found and fixed three real, confirmable-by-inspection defects the next
+person to actually run `docker compose up` would otherwise have hit
+immediately:
+
+- The backend image never ran `alembic upgrade head` — a fresh container
+  would boot against an empty SQLite file and every request would fail
+  with `no such table: farmers` (the exact bug independently hit while
+  starting a local dev server for this same audit). The image's `CMD` now
+  runs the migration before starting uvicorn.
+- The frontend's nginx stage shipped no `nginx.conf` at all, so nginx's
+  default config has no SPA fallback — since the app uses React Router's
+  `BrowserRouter`, any direct load or refresh on a route other than `/`
+  (e.g. `/fields/1/analysis`) would 404. Added `frontend/nginx.conf` with
+  `try_files $uri $uri/ /index.html;`.
+- `docker-compose.yml` and `frontend/Dockerfile` still passed a
+  `VITE_DATA_MODE` build arg — a leftover from before the frontend was
+  built; nothing has read that variable since `DataModeBadge` was changed
+  to always source its mode from the backend's own `/health` response (see
+  `docs/architecture.md` "Frontend"). Removed.
+
+None of this has been confirmed against a real `docker compose up` — treat
+it as a corrected starting point, not confirmed-working, until someone with
+Docker actually runs it.
 
 ## What this document does not cover
 
