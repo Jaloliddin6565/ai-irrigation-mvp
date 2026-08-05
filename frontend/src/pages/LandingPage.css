@@ -1,0 +1,21 @@
+.landing {
+  padding-bottom: var(--space-6);
+}
+
+.landing__hero {
+  padding: var(--space-6) 0 var(--space-5);
+}
+
+.landing__lead {
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+  max-width: 60ch;
+}
+
+.landing__columns {
+  align-items: stretch;
+}
+
+.landing__columns .card {
+  flex: 1 1 260px;
+}
