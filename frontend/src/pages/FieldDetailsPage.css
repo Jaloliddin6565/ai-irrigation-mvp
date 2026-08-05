@@ -1,0 +1,10 @@
+.field-details__header {
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.field-details__section-header {
+  justify-content: space-between;
+  align-items: center;
+}
