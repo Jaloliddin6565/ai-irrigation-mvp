@@ -274,6 +274,40 @@ table.data-table td {
   min-height: 260px;
 }
 
+.chart-data-table {
+  margin-top: var(--space-3);
+}
+
+.chart-data-table summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: var(--space-2) 0;
+}
+
+/* Shared "label/value fact grid" pattern — used by FieldSummaryCard,
+   AnalysisLauncher, DataSourcePanel, FieldDetailsPage and
+   AnalysisResultView, none of which otherwise share a page/chunk, so this
+   lives in the always-loaded global stylesheet rather than a page-specific
+   one (see docs/architecture.md "Frontend bundle" on route code-splitting). */
+.field-summary-card__facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.field-summary-card__facts dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.field-summary-card__facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
 @media (max-width: 640px) {
   .container {
     padding: 0 var(--space-3);
