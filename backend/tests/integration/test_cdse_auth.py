@@ -2,6 +2,8 @@
 calls — respx intercepts httpx at the transport layer.
 """
 
+import asyncio
+
 import httpx
 import pytest
 import respx
@@ -53,6 +55,31 @@ async def test_cached_token_is_reused_without_a_second_request() -> None:
     client = _token_client()
     await client.get_token()
     await client.get_token()
+    assert route.call_count == 1
+
+
+@respx.mock
+def test_token_client_survives_reuse_across_separate_asyncio_run_calls() -> None:
+    """Reproduces the real production call pattern: `CdseTokenClient` is a
+    process-lifetime singleton (providers/factory.py, @lru_cache) but each
+    provider call is bridged from sync to async via its own `asyncio.run()`
+    (see app/providers/satellite/cdse.py) — a fresh event loop every time.
+    Found via a Phase 6 live-mode walkthrough: a lock created once in
+    __init__ bound to the first loop and then raised `RuntimeError: ...
+    is bound to a different event loop` on the second call. Deliberately
+    uses asyncio.run() twice on the *same* client instance rather than
+    awaiting twice within one test's loop, which would never have caught
+    this."""
+    route = respx.post(TOKEN_URL).mock(
+        return_value=httpx.Response(200, json={"access_token": "tok-1", "expires_in": 3600})
+    )
+    client = _token_client()
+
+    first = asyncio.run(client.get_token())
+    second = asyncio.run(client.get_token())
+
+    assert first == "tok-1"
+    assert second == "tok-1"
     assert route.call_count == 1
 
 

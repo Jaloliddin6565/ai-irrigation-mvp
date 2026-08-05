@@ -8,8 +8,16 @@ Security rules (see CLAUDE.md rule 7 and docs/security.md):
   database, never written to a file, never returned in an API response,
   never logged, never embedded in an exception message.
 - Refreshed proactively `token_expiry_margin_seconds` before expiry.
-- A single `asyncio.Lock` serializes concurrent refreshes so parallel
-  callers within one process don't each fire a fresh token request.
+- An `asyncio.Lock`, recreated per event loop, serializes concurrent
+  refreshes so parallel callers within one asyncio.run() call don't each
+  fire a fresh token request. This client is a process-lifetime singleton
+  (`providers/factory.py::_cdse_token_client`, `@lru_cache`) reused across
+  many separate `asyncio.run()` calls (the sync-facade-over-async-internals
+  bridging pattern — each provider call gets its own event loop); a lock
+  created once in `__init__` would bind to the first loop it was awaited in
+  and then raise `RuntimeError: ... is bound to a different event loop` on
+  every later call from a new loop, so it is lazily (re)created whenever the
+  running loop differs from the one it was last bound to.
 - Exactly one automatic re-authentication retry on a 401 from a protected
   request — never an unbounded/looping retry.
 """
@@ -70,10 +78,19 @@ class CdseTokenClient:
         self._clock = clock
         self._transport = transport
         self._cached: _CachedToken | None = None
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None
+        self._lock_loop: asyncio.AbstractEventLoop | None = None
+
+    def _get_lock(self) -> asyncio.Lock:
+        # See the class-level note on why this is per-loop, not created once.
+        loop = asyncio.get_running_loop()
+        if self._lock is None or self._lock_loop is not loop:
+            self._lock = asyncio.Lock()
+            self._lock_loop = loop
+        return self._lock
 
     async def get_token(self, *, force_refresh: bool = False) -> str:
-        async with self._lock:
+        async with self._get_lock():
             if (
                 not force_refresh
                 and self._cached is not None
