@@ -63,16 +63,44 @@ and phased roadmap context.
 
 ## Where things go
 
-- `backend/app/domain/` — pure business logic (water balance, recommendation,
-  confidence, crop stage, geo/polygon math). No I/O, no framework imports,
-  fully unit-testable, no randomness.
+- `backend/app/domain/` — pure business logic (crop_stage, water_balance,
+  initialization, irrigation_normalization, satellite_adjustment,
+  recommendation, confidence, geo/polygon math). No I/O, no framework
+  imports, fully unit-testable, no randomness. Two independent version
+  numbers exist on purpose: `ANALYSIS_METHODOLOGY_VERSION`
+  (`app/services/analysis.py`) versions this *calculation code*; each YAML
+  file's own `methodology_version` versions the *agronomic values* fed
+  into it. Don't conflate them when bumping one or the other.
 - `backend/app/providers/` — the only place external I/O (CDSE, Open-Meteo)
   happens, behind `SatelliteProvider`/`WeatherProvider` interfaces with
-  fixture and live implementations.
+  fixture (`*/fixture.py`) and live (`weather/open_meteo.py`,
+  `satellite/{cdse.py,cdse_auth.py,catalog.py,statistics.py,quality.py,
+  scl.py}`) implementations. `providers/factory.py` is the **only** place
+  `DATA_MODE` selects a concrete provider class — application code (incl.
+  `app/services/analysis.py`) calls the factory, never a concrete provider
+  class directly.
+- `backend/app/core/` — cross-cutting infrastructure with no business logic:
+  `http_client.py` (bounded-retry async HTTP client shared by live
+  providers), `provider_errors.py` (typed `AppError` subclasses for every
+  external-provider failure mode), `cache.py` (in-memory TTL cache for
+  normalized provider responses), plus `errors.py`/`logging.py`.
 - `backend/app/api/` — thin FastAPI routers: validate input, call domain/
   providers, shape output. No business logic here.
 - `backend/config/*.yaml` — all agronomic configuration (crop Kc curves, soil
   parameters, irrigation efficiencies, confidence weights).
+- `backend/scripts/live_smoke_test.py` — the **only** sanctioned way to make
+  a real live-credential request. Never invoked automatically by anything
+  (not CI, not application code) — see rule 7 and `docs/deployment.md`.
+- `frontend/src/api/` — the **only** place the frontend talks to this
+  backend (typed fetch client, per-resource functions, TanStack Query
+  hooks). Never call Open-Meteo or CDSE directly from the frontend, never
+  add a `VITE_`-prefixed credential/secret variable — see rule 7 and
+  `docs/architecture.md` "Frontend". `frontend/src/noSecretsInFrontend.test.ts`
+  enforces this automatically.
+- `frontend/src/features/farmer/ActiveFarmerContext.tsx` — the trusted-MVP
+  "active farmer id" (React state + `localStorage`). This is a UX
+  convenience, not authentication — never treat it as identity or a
+  security boundary in frontend code; see rule 6 and `docs/security.md`.
 
 ## Persistent in-app disclaimer
 

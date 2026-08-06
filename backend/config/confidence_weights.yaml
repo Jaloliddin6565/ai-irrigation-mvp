@@ -1,0 +1,41 @@
+# Confidence scoring weights — GENERIC PLACEHOLDER VALUES, not derived from
+# validated Uzbekistan outcome data; MUST be validated against local field
+# trials before being used to drive real irrigation decisions.
+#
+# This produces a 0-1 score from a weighted sum of factor scores (each
+# factor independently scored 0-1 by app/domain/confidence.py), then maps
+# the score to a category via the thresholds below, then applies the caps
+# below (a cap only ever LOWERS the score, never raises it). This is a
+# documented heuristic, not a trained model's probability estimate — see
+# docs/methodology.md.
+
+methodology_version: "0.2.0"
+
+weights:
+  field_data_completeness: 0.12
+  crop_profile_quality: 0.08
+  soil_profile_quality: 0.08
+  planting_date_availability: 0.05
+  last_irrigation_availability: 0.10
+  irrigation_amount_quality: 0.15
+  initialization_certainty: 0.15
+  weather_data_availability: 0.10
+  satellite_freshness: 0.07
+  valid_pixel_ratio: 0.05
+  observation_count: 0.05
+
+thresholds:
+  high: 0.70
+  medium: 0.40
+
+# Each cap is an upper bound applied AFTER the weighted sum, only when its
+# condition holds (see app/domain/confidence.py for exactly when each
+# condition is considered true). This is what guarantees, e.g., that an
+# unknown irrigation amount can never produce a "high" confidence result
+# even if every other factor looks great.
+caps:
+  max_score_if_irrigation_amount_unknown: 0.65
+  max_score_if_soil_unknown: 0.65
+  max_score_if_initialization_weak: 0.55
+  max_score_if_satellite_stale_or_low_quality: 0.85
+  max_score_if_weather_missing: 0.50

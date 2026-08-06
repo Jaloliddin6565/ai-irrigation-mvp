@@ -1,0 +1,12 @@
+.data-source-panel__header {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.data-source-panel__columns {
+  align-items: flex-start;
+}
+
+.data-source-panel__columns > div {
+  flex: 1 1 260px;
+}
