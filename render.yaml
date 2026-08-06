@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: ai-irrigation-pilot-jaloliddin6565
+    runtime: docker
+    region: frankfurt
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: APP_ENV
+        value: pilot
+      - key: DATA_MODE
+        value: live
+      - key: TIMEZONE
+        value: Asia/Tashkent
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-irrigation-pilot-db
+          property: connectionString
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://ai-irrigation-pilot-jaloliddin6565.onrender.com
+      - key: PILOT_USERNAME
+        sync: false
+      - key: PILOT_PASSWORD
+        sync: false
+      - key: CDSE_CLIENT_ID
+        sync: false
+      - key: CDSE_CLIENT_SECRET
+        sync: false
+      - key: OPEN_METEO_FORECAST_URL
+        value: https://api.open-meteo.com/v1/forecast
+      - key: OPEN_METEO_ARCHIVE_URL
+        value: https://archive-api.open-meteo.com/v1/archive
+      - key: SATELLITE_LOOKBACK_DAYS
+        value: "90"
+      - key: MIN_VALID_PIXEL_RATIO
+        value: "0.60"
+      - key: MAX_SCENE_CLOUD_COVER
+        value: "80"
+      - key: TOKEN_EXPIRY_MARGIN_SECONDS
+        value: "120"
+      - key: HTTP_TIMEOUT_SECONDS
+        value: "30"
+      - key: HTTP_MAX_RETRIES
+        value: "3"
+      - key: WEATHER_CACHE_TTL_SECONDS
+        value: "3600"
+      - key: SATELLITE_CACHE_TTL_SECONDS
+        value: "3600"
+
+databases:
+  - name: ai-irrigation-pilot-db
+    region: frankfurt
+    plan: free
+    postgresMajorVersion: "17"
+    ipAllowList: []
