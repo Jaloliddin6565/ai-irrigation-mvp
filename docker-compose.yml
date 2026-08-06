@@ -1,12 +1,17 @@
 services:
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
     ports:
       - "8000:8000"
     environment:
+      APP_ENV: development
       DATA_MODE: fixture
       DATABASE_URL: sqlite:////data/ai_irrigation.db
-      CORS_ALLOWED_ORIGINS: http://localhost:5173
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:8000
       LOG_LEVEL: INFO
     volumes:
       - backend-db:/data
@@ -17,8 +22,7 @@ services:
       # Vite bakes these into the static bundle at build time, so they must
       # be build args, not container-runtime environment variables. There is
       # no VITE_DATA_MODE — the frontend always reads the live data_mode
-      # from the backend's own /health response (see docs/architecture.md
-      # "Frontend"), never a static build-time flag.
+      # from the backend's own /health response.
       args:
         VITE_API_BASE_URL: http://localhost:8000
     ports:
