@@ -202,6 +202,20 @@ def test_delete_field(db_client: TestClient) -> None:
     assert get_response.status_code == 404
 
 
+def _irrigation_event_count(db_session: Session, field_id: int) -> int:
+    stmt = (
+        select(func.count())
+        .select_from(IrrigationEvent)
+        .where(IrrigationEvent.field_id == field_id)
+    )
+    return db_session.scalar(stmt) or 0
+
+
+def _analysis_count(db_session: Session, field_id: int) -> int:
+    stmt = select(func.count()).select_from(Analysis).where(Analysis.field_id == field_id)
+    return db_session.scalar(stmt) or 0
+
+
 def test_delete_field_cascades_to_irrigation_events_and_analyses(
     db_client: TestClient, db_session: Session
 ) -> None:
@@ -226,28 +240,11 @@ def test_delete_field_cascades_to_irrigation_events_and_analyses(
     )
     assert analysis_response.status_code == 201
 
-    assert db_session.scalar(
-        select(func.count()).select_from(IrrigationEvent).where(IrrigationEvent.field_id == field_id)
-    ) == 1
-    assert (
-        db_session.scalar(
-            select(func.count()).select_from(Analysis).where(Analysis.field_id == field_id)
-        )
-        == 1
-    )
+    assert _irrigation_event_count(db_session, field_id) == 1
+    assert _analysis_count(db_session, field_id) == 1
 
     delete_response = db_client.delete(f"/api/fields/{field_id}")
     assert delete_response.status_code == 204
 
-    assert (
-        db_session.scalar(
-            select(func.count()).select_from(IrrigationEvent).where(IrrigationEvent.field_id == field_id)
-        )
-        == 0
-    )
-    assert (
-        db_session.scalar(
-            select(func.count()).select_from(Analysis).where(Analysis.field_id == field_id)
-        )
-        == 0
-    )
+    assert _irrigation_event_count(db_session, field_id) == 0
+    assert _analysis_count(db_session, field_id) == 0
