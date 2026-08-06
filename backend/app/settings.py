@@ -6,7 +6,8 @@ provider credentials directly — everything else receives already-resolved
 settings via dependency injection.
 
 Never log a Settings instance directly (str(settings) would include
-cdse_client_secret) — read individual non-secret fields instead.
+cdse_client_secret and pilot_password) — read individual non-secret fields
+instead.
 """
 
 from enum import StrEnum
@@ -19,6 +20,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = BACKEND_ROOT / "config"
 FIXTURES_DIR = BACKEND_ROOT / "fixtures"
+FRONTEND_DIST_DIR = BACKEND_ROOT / "frontend_dist"
 
 
 class DataMode(StrEnum):
@@ -45,6 +47,11 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = Field(default="http://localhost:5173", alias="CORS_ALLOWED_ORIGINS")
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    # Shared HTTP Basic gate for controlled pilot deployments. This protects
+    # the pilot URL from casual public access but is not farmer-level auth.
+    pilot_username: str | None = Field(default=None, alias="PILOT_USERNAME")
+    pilot_password: str | None = Field(default=None, alias="PILOT_PASSWORD")
 
     # Field polygon validation limits — deliberately conservative defaults;
     # see docs/validation.md.
@@ -151,6 +158,15 @@ class Settings(BaseSettings):
                 "Refusing to silently fall back to fixture data."
             )
         return self.cdse_client_id, self.cdse_client_secret
+
+    def require_pilot_credentials(self) -> tuple[str, str]:
+        """Return the shared pilot credentials or fail closed."""
+        if not self.pilot_username or not self.pilot_password:
+            raise RuntimeError(
+                "APP_ENV=pilot requires PILOT_USERNAME and PILOT_PASSWORD. "
+                "Refusing to expose the unauthenticated MVP publicly."
+            )
+        return self.pilot_username, self.pilot_password
 
 
 @lru_cache
