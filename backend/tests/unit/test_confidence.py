@@ -169,3 +169,32 @@ def test_deterministic_repeated_calls() -> None:
 def test_weather_availability_feeds_the_factor_score_directly(fraction: float) -> None:
     result = compute_confidence(**_base_kwargs(weather_available_fraction=fraction))
     assert result.factor_scores.weather_data_availability == pytest.approx(fraction)
+
+
+def test_strong_and_weak_factors_are_stable_keys_not_narrative_sentences() -> None:
+    """strong_factors/weak_factors must be plain factor-name keys (same
+    keys as factor_scores/triggered_caps), not English prose — the frontend
+    translates by key, it does not parse sentences."""
+    best = compute_confidence(**_base_kwargs())
+    assert best.strong_factors
+    for name in best.strong_factors:
+        assert name in best.factor_scores.as_dict()
+        assert " " not in name
+
+    worst = compute_confidence(
+        **_base_kwargs(
+            crop_variety_present=False,
+            expected_harvest_date_present=False,
+            irrigation_method_known=False,
+            notes_present=False,
+            crop_stage_is_edge_case=True,
+            soil_profile_uncertainty_factor=1.0,
+            soil_requires_field_survey=True,
+            initialization=BAD_INIT,
+            weather_available_fraction=0.0,
+            satellite=BAD_SATELLITE,
+        )
+    )
+    assert worst.weak_factors
+    for name in worst.weak_factors:
+        assert name in worst.factor_scores.as_dict()

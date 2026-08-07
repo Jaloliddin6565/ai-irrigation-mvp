@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useHealth, useIrrigationEvents, useRunAnalysis } from "../../api/hooks";
 import { ApiErrorPanel } from "../../components/feedback/ApiErrorPanel";
 import { DataModeBadge } from "../../components/layout/DataModeBadge";
+import { RecentIrrigationPrompt } from "../irrigation/RecentIrrigationPrompt";
 import { formatDate, formatDateTime, todayIsoDate } from "../../utils/format";
 import type { AnalysisResponse, FieldRead } from "../../types/api";
 
@@ -64,6 +65,8 @@ export function AnalysisLauncher({
       {health.data?.data_mode === "live" ? (
         <p className="alert alert--info">{t("analysisLauncher.liveModeNotice")}</p>
       ) : null}
+
+      {irrigations.data ? <RecentIrrigationPrompt fieldId={field.id} lastIrrigation={lastIrrigation} /> : null}
 
       <div className="field">
         <label htmlFor="analysis_date">{t("analysisLauncher.analysisDate")}</label>

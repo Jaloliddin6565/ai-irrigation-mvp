@@ -119,6 +119,28 @@ def test_tier4_conservative_default_anchored_at_earliest_weather_date() -> None:
     assert result.uncertainty > 0.5
 
 
+def test_tier4_warning_codes_distinguish_missing_irrigation_from_stale_planting_date() -> None:
+    """Regression: the pilot walkthrough found the tier-4 English message
+    ("no in-window planting date") reading as if planting_date were missing.
+    planting_date is a required field — it can only be present but outside
+    the anchor window. The structured codes must say so, as two distinct
+    messages, never conflated into one."""
+    old_planting = ANALYSIS_DATE - timedelta(days=200)
+    weather_dates = [ANALYSIS_DATE - timedelta(days=10), ANALYSIS_DATE - timedelta(days=9)]
+    result = _run(planting_date=old_planting, weather_available_dates=weather_dates)
+
+    codes = {m.code for m in result.warning_codes}
+    assert "no_recent_irrigation_record" in codes
+    assert "planting_date_outside_anchor_window" in codes
+
+    planting_date_message = next(
+        m for m in result.warning_codes if m.code == "planting_date_outside_anchor_window"
+    )
+    assert planting_date_message.params["planting_date"] == old_planting.isoformat()
+    assert planting_date_message.params["days_since_planting"] == 200
+    assert planting_date_message.params["max_anchor_age_days"] == 90
+
+
 def test_tier5_insufficient_data_when_nothing_usable() -> None:
     old_planting = ANALYSIS_DATE - timedelta(days=200)
     result = _run(planting_date=old_planting, weather_available_dates=[])

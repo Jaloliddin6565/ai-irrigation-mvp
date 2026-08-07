@@ -35,5 +35,16 @@ recommended_range:
 
 # Extra +/- padding applied to the range width when confidence is not high,
 # as a fraction of the base range — a low-confidence result should look
-# less falsely precise than a high-confidence one.
-uncertainty_range_padding_fraction: 0.15
+# less falsely precise than a high-confidence one. High confidence gets no
+# padding at all (see app/domain/recommendation.py).
+#
+# Two separate constants (medium narrower than low) so a confidence just
+# under "high" doesn't get the same treatment as a confidence near zero —
+# the single shared value previously here made every non-high result widen
+# to an identical, fixed 2:1 max:min ratio regardless of how close to
+# "high" the score actually was. GENERIC PILOT STARTING POINT, not derived
+# from validated Uzbekistan outcome data — MUST be validated against local
+# field trials before being used to drive real irrigation decisions, same
+# as every other constant in this file.
+uncertainty_range_padding_fraction_medium: 0.10
+uncertainty_range_padding_fraction_low: 0.15

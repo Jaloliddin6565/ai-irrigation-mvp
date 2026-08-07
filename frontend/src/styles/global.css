@@ -284,6 +284,30 @@ table.data-table td {
   padding: var(--space-2) 0;
 }
 
+/* Reusable disclosure widget for advanced/expert content (advanced field
+   form sections, expert analysis detail) — same open/close idiom as
+   .chart-data-table above, styled as its own block so it reads as an
+   optional section rather than a data-table fallback. */
+.collapsible-section {
+  margin-top: var(--space-3);
+}
+
+.collapsible-section__summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: var(--space-2) 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.collapsible-section__body {
+  padding-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 /* Shared "label/value fact grid" pattern — used by FieldSummaryCard,
    AnalysisLauncher, DataSourcePanel, FieldDetailsPage and
    AnalysisResultView, none of which otherwise share a page/chunk, so this

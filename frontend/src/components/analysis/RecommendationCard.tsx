@@ -1,9 +1,10 @@
 import { useTranslation } from "react-i18next";
 
 import "./RecommendationCard.css";
+import { CollapsibleSection } from "../disclosure/CollapsibleSection";
 import { formatDate, formatM3, formatMm } from "../../utils/format";
-import { recommendationStatusKey } from "../../utils/labels";
-import type { RecommendationSchema } from "../../types/api";
+import { messageCodeKey, recommendationStatusKey } from "../../utils/labels";
+import type { MessageCode, RecommendationSchema } from "../../types/api";
 
 const STATUS_TONE: Record<string, "good" | "watch" | "urgent" | "neutral"> = {
   no_irrigation_needed: "good",
@@ -27,12 +28,40 @@ export function RecommendationCard({
   const tone = STATUS_TONE[recommendation.status] ?? "neutral";
   const hasRange = recommendation.status !== "insufficient_data";
 
+  function translateMessage(message: MessageCode): string {
+    return t(messageCodeKey(message.code), message.params);
+  }
+
+  // Pulled out of reason_codes to show as its own "why is the range this
+  // wide" line, right next to the range it explains, rather than buried in
+  // the general reasons list below.
+  const rangeWidthReason = recommendation.reason_codes.find(
+    (message) => message.code === "confidence_range_widened"
+  );
+  const otherReasonCodes = recommendation.reason_codes.filter(
+    (message) => message.code !== "confidence_range_widened"
+  );
+
   return (
     <section className={`card recommendation-card recommendation-card--${tone}`}>
       <p className="recommendation-card__status">{t(recommendationStatusKey(recommendation.status))}</p>
 
       {hasRange ? (
         <div className="recommendation-card__ranges">
+          {recommendation.depletion_mm !== null ? (
+            <div>
+              <span className="recommendation-card__range-label">{t("recommendation.netDeficit")}</span>
+              <strong>{formatMm(recommendation.depletion_mm)}</strong>
+            </div>
+          ) : null}
+          {recommendation.base_gross_mm !== null ? (
+            <div>
+              <span className="recommendation-card__range-label">
+                {t("recommendation.grossApplication")}
+              </span>
+              <strong>{formatMm(recommendation.base_gross_mm)}</strong>
+            </div>
+          ) : null}
           <div>
             <span className="recommendation-card__range-label">{t("recommendation.perHectare")}</span>
             <strong>
@@ -63,26 +92,51 @@ export function RecommendationCard({
         </div>
       ) : null}
 
-      {recommendation.reasons.length > 0 ? (
+      {rangeWidthReason ? (
+        <p className="field-hint">
+          <strong>{t("recommendation.uncertaintyRangeTitle")}:</strong> {translateMessage(rangeWidthReason)}
+        </p>
+      ) : null}
+
+      {otherReasonCodes.length > 0 ? (
         <div>
           <h3>{t("recommendation.reasons")}</h3>
           <ul>
-            {recommendation.reasons.map((reason) => (
-              <li key={reason}>{reason}</li>
+            {otherReasonCodes.map((message, index) => (
+              <li key={`${message.code}-${index}`}>{translateMessage(message)}</li>
             ))}
           </ul>
         </div>
       ) : null}
 
-      {recommendation.warnings.length > 0 ? (
+      {recommendation.warning_codes.length > 0 ? (
         <div className="alert alert--warning">
           <h3>{t("recommendation.warnings")}</h3>
           <ul>
-            {recommendation.warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
+            {recommendation.warning_codes.map((message, index) => (
+              <li key={`${message.code}-${index}`}>{translateMessage(message)}</li>
             ))}
           </ul>
         </div>
+      ) : null}
+
+      {recommendation.reasons.length > 0 || recommendation.warnings.length > 0 ? (
+        <CollapsibleSection title={t("recommendation.technicalDetails")}>
+          {recommendation.reasons.length > 0 ? (
+            <ul>
+              {recommendation.reasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          ) : null}
+          {recommendation.warnings.length > 0 ? (
+            <ul>
+              {recommendation.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
+        </CollapsibleSection>
       ) : null}
 
       <p className="field-hint">

@@ -261,12 +261,19 @@ export interface SatelliteSummary {
   rejected_acquisitions_count: number;
 }
 
+export interface MessageCode {
+  code: string;
+  params: Record<string, string | number | boolean>;
+  text_en: string;
+}
+
 export interface InitializationSummary {
   method: InitializationMethod;
   start_date: string | null;
   starting_depletion_mm: number | null;
   uncertainty: number;
   warnings: string[];
+  warning_codes: MessageCode[];
 }
 
 export interface DailyWaterBalanceRow {
@@ -301,6 +308,8 @@ export interface WaterBalanceSummary {
 
 export interface RecommendationSchema {
   status: RecommendationStatus;
+  depletion_mm: number | null;
+  base_gross_mm: number | null;
   recommended_min_mm: number;
   recommended_max_mm: number;
   recommended_min_m3_per_ha: number;
@@ -311,6 +320,8 @@ export interface RecommendationSchema {
   window_end_date: string | null;
   reasons: string[];
   warnings: string[];
+  reason_codes: MessageCode[];
+  warning_codes: MessageCode[];
 }
 
 export interface ConfidenceSchema {
@@ -319,8 +330,8 @@ export interface ConfidenceSchema {
   factor_scores: Record<string, number>;
   weights: Record<string, number>;
   triggered_caps: string[];
-  positive_factors: string[];
-  negative_factors: string[];
+  strong_factors: string[];
+  weak_factors: string[];
 }
 
 export interface AnalysisResponse {
@@ -440,9 +451,16 @@ export interface WeatherResponse {
 
 // --- Errors -----------------------------------------------------------
 
+export interface ApiFieldError {
+  field: string;
+  code: string;
+  message_uz: string;
+}
+
 export interface ApiErrorBody {
   code: string;
   message_uz: string;
   message_en?: string | null;
   details?: Record<string, unknown> | null;
+  field_errors?: ApiFieldError[] | null;
 }

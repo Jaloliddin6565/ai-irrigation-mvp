@@ -11,8 +11,31 @@
   align-items: center;
 }
 
+.polygon-editor__actions {
+  flex-wrap: wrap;
+}
+
+.polygon-editor__actions .button {
+  min-height: 44px;
+}
+
 @media (max-width: 640px) {
   .polygon-editor__map {
-    height: 300px;
+    height: 340px;
+  }
+
+  .polygon-editor__map .leaflet-touch .leaflet-bar a,
+  .polygon-editor__map .leaflet-pm-toolbar .button-container a {
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+  }
+
+  .polygon-editor__map .leaflet-control-layers {
+    font-size: 1rem;
+  }
+
+  .polygon-editor__map .leaflet-control-layers label {
+    padding: 6px 0;
   }
 }

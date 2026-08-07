@@ -71,8 +71,13 @@ class ConfidenceResult:
     factor_scores: ConfidenceFactorScores
     weights: dict[str, float]
     triggered_caps: list[str] = field(default_factory=list)
-    positive_factors: list[str] = field(default_factory=list)
-    negative_factors: list[str] = field(default_factory=list)
+    # Plain factor-name keys (same keys as ConfidenceFactorScores.as_dict()),
+    # not narrative sentences — the frontend already needs a stable-key ->
+    # Uzbek-label mapping for factor_scores/triggered_caps, so this stays
+    # consistent with that rather than duplicating English prose that would
+    # need its own translation path.
+    strong_factors: list[str] = field(default_factory=list)
+    weak_factors: list[str] = field(default_factory=list)
 
 
 def _score_field_data_completeness(
@@ -196,15 +201,11 @@ def compute_confidence(
     else:
         category = "low"
 
-    positive_factors = [
-        f"{name} is strong ({value:.2f})"
-        for name, value in scores.items()
-        if value >= _HIGH_SCORE_THRESHOLD_FOR_NARRATIVE
+    strong_factors = [
+        name for name, value in scores.items() if value >= _HIGH_SCORE_THRESHOLD_FOR_NARRATIVE
     ]
-    negative_factors = [
-        f"{name} is weak ({value:.2f})"
-        for name, value in scores.items()
-        if value < _LOW_SCORE_THRESHOLD_FOR_NARRATIVE
+    weak_factors = [
+        name for name, value in scores.items() if value < _LOW_SCORE_THRESHOLD_FOR_NARRATIVE
     ]
 
     return ConfidenceResult(
@@ -214,6 +215,6 @@ def compute_confidence(
         factor_scores=factor_scores,
         weights=dict(weights),
         triggered_caps=triggered_caps,
-        positive_factors=positive_factors,
-        negative_factors=negative_factors,
+        strong_factors=strong_factors,
+        weak_factors=weak_factors,
     )

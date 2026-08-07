@@ -3,6 +3,20 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+
+class MessageCode(BaseModel):
+    """Stable code + structured params for a reason/warning, so the
+    frontend can translate it into Uzbek (frontend/src/utils/labels.ts,
+    frontend/src/i18n/uz.json) instead of pattern-matching English prose.
+    text_en is kept only for the technical/expert debug view."""
+
+    model_config = ConfigDict(frozen=True)
+
+    code: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    text_en: str
+
+
 DISCLAIMER_UZ = (
     "Ushbu tavsiya masofaviy ma'lumotlar, ob-havo modeli va fermer kiritgan "
     "ma'lumotlar asosidagi taxminiy qaror ko'magidir. Tizim tuproq namligini "
@@ -126,6 +140,7 @@ class InitializationSummary(BaseModel):
     starting_depletion_mm: float | None
     uncertainty: float
     warnings: list[str] = Field(default_factory=list)
+    warning_codes: list[MessageCode] = Field(default_factory=list)
 
 
 class WaterBalanceSummary(BaseModel):
@@ -146,6 +161,8 @@ class RecommendationSchema(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     status: str
+    depletion_mm: float | None
+    base_gross_mm: float | None
     recommended_min_mm: float
     recommended_max_mm: float
     recommended_min_m3_per_ha: float
@@ -156,6 +173,8 @@ class RecommendationSchema(BaseModel):
     window_end_date: date | None
     reasons: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    reason_codes: list[MessageCode] = Field(default_factory=list)
+    warning_codes: list[MessageCode] = Field(default_factory=list)
 
 
 class ConfidenceSchema(BaseModel):
@@ -166,8 +185,8 @@ class ConfidenceSchema(BaseModel):
     factor_scores: dict[str, float]
     weights: dict[str, float]
     triggered_caps: list[str] = Field(default_factory=list)
-    positive_factors: list[str] = Field(default_factory=list)
-    negative_factors: list[str] = Field(default_factory=list)
+    strong_factors: list[str] = Field(default_factory=list)
+    weak_factors: list[str] = Field(default_factory=list)
 
 
 class AnalysisResponse(BaseModel):

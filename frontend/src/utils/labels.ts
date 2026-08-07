@@ -48,3 +48,23 @@ export function qualitativeAmountKey(amount: QualitativeAmount): string {
 export function valueSourceKey(source: ValueSource): string {
   return `irrigation.valueSource.${source}`;
 }
+
+// Confidence factor names (ConfidenceSchema.factor_scores /
+// .triggered_caps / .strong_factors / .weak_factors keys) are stable
+// backend strings, not farmer-facing text — this maps them the same way as
+// every other enum-key mapper above.
+export function confidenceFactorKey(factorName: string): string {
+  return `confidence.factor.${factorName}`;
+}
+
+export function triggeredCapKey(capName: string): string {
+  return `confidence.cap.${capName}`;
+}
+
+// Reason/warning message codes (MessageCode.code from RecommendationSchema
+// .reason_codes/.warning_codes and InitializationSummary.warning_codes) —
+// the Uzbek template lives at this i18n key and is interpolated with
+// MessageCode.params via react-i18next's {{param}} syntax.
+export function messageCodeKey(code: string): string {
+  return `messages.${code}`;
+}

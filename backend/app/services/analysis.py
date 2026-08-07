@@ -31,6 +31,7 @@ from app.domain.initialization import (
     determine_initialization,
 )
 from app.domain.irrigation_normalization import normalize_irrigation_event
+from app.domain.messages import Message
 from app.domain.recommendation import determine_recommendation
 from app.domain.satellite_adjustment import (
     SatelliteObservationInput,
@@ -54,6 +55,7 @@ from app.schemas.analysis import (
     DailyWaterBalanceRowSchema,
     FieldSummary,
     InitializationSummary,
+    MessageCode,
     RecommendationSchema,
     SatelliteSummary,
     WaterBalanceSummary,
@@ -63,6 +65,10 @@ from app.services.fields import get_field_or_404
 from app.settings import get_settings
 
 ANALYSIS_METHODOLOGY_VERSION = "0.3.0"
+
+
+def _to_message_codes(messages: list[Message]) -> list[MessageCode]:
+    return [MessageCode(code=m.code, params=m.params, text_en=m.text_en) for m in messages]
 
 
 def _resolve_soil_water_params(field: Field, soil_profile: SoilProfile) -> tuple[float, float]:
@@ -465,7 +471,8 @@ def analyze_field(
         forecast_rain_delay_threshold_mm=rec_defaults.forecast_rain.delay_threshold_mm,
         min_replacement_fraction=rec_defaults.recommended_range.min_replacement_fraction,
         max_replacement_fraction=rec_defaults.recommended_range.max_replacement_fraction,
-        uncertainty_range_padding_fraction=rec_defaults.uncertainty_range_padding_fraction,
+        uncertainty_range_padding_fraction_medium=rec_defaults.uncertainty_range_padding_fraction_medium,
+        uncertainty_range_padding_fraction_low=rec_defaults.uncertainty_range_padding_fraction_low,
         extra_reasons=satellite_result.reasons,
     )
     all_warnings.extend(recommendation_result.warnings)
@@ -487,6 +494,7 @@ def analyze_field(
         starting_depletion_mm=init_result.starting_depletion_mm,
         uncertainty=init_result.uncertainty,
         warnings=init_result.warnings,
+        warning_codes=_to_message_codes(init_result.warning_codes),
     )
     weather_summary_schema = WeatherSummary(
         data_mode=settings.data_mode.value,
@@ -538,6 +546,8 @@ def analyze_field(
     )
     recommendation_schema = RecommendationSchema(
         status=recommendation_result.status.value,
+        depletion_mm=recommendation_result.depletion_mm,
+        base_gross_mm=recommendation_result.base_gross_mm,
         recommended_min_mm=recommendation_result.recommended_min_mm,
         recommended_max_mm=recommendation_result.recommended_max_mm,
         recommended_min_m3_per_ha=recommendation_result.recommended_min_m3_per_ha,
@@ -552,6 +562,8 @@ def analyze_field(
         else None,
         reasons=recommendation_result.reasons,
         warnings=recommendation_result.warnings,
+        reason_codes=_to_message_codes(recommendation_result.reason_codes),
+        warning_codes=_to_message_codes(recommendation_result.warning_codes),
     )
     confidence_schema = ConfidenceSchema(
         score=confidence_result.score,
@@ -559,8 +571,8 @@ def analyze_field(
         factor_scores=confidence_result.factor_scores.as_dict(),
         weights=confidence_result.weights,
         triggered_caps=confidence_result.triggered_caps,
-        positive_factors=confidence_result.positive_factors,
-        negative_factors=confidence_result.negative_factors,
+        strong_factors=confidence_result.strong_factors,
+        weak_factors=confidence_result.weak_factors,
     )
 
     # Deduplicate warnings while preserving order.
