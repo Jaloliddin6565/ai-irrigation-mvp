@@ -6,13 +6,15 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./PolygonEditor.css";
+import { addBaseLayers, isSatelliteLayerConfigured } from "./tileLayers";
+import { applyUzbekGeomanLang } from "./geomanLang";
+import { useGeolocation } from "./useGeolocation";
 import { approxPolygonAreaHectares, UZBEKISTAN_CENTER, UZBEKISTAN_DEFAULT_ZOOM } from "../../utils/geo";
 import type { GeoJsonPolygon } from "../../types/api";
 
-const TILE_URL = import.meta.env.VITE_MAP_TILE_URL ?? "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const TILE_ATTRIBUTION =
-  import.meta.env.VITE_MAP_TILE_ATTRIBUTION ??
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+applyUzbekGeomanLang();
+
+const GEOLOCATION_ZOOM = 15;
 
 function layerToPolygon(layer: L.Polygon): GeoJsonPolygon {
   const geoJson = layer.toGeoJSON();
@@ -42,18 +44,24 @@ export function PolygonEditor({ value, onChange }: PolygonEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const groupRef = useRef<L.FeatureGroup | null>(null);
+  const locationLayerRef = useRef<L.LayerGroup | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const geolocation = useGeolocation();
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current).setView(UZBEKISTAN_CENTER, UZBEKISTAN_DEFAULT_ZOOM);
-    L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: 19 }).addTo(map);
+    addBaseLayers(map, {
+      satellite: t("field.baseLayerSatellite"),
+      plain: t("field.baseLayerPlain"),
+    });
 
     const group = L.featureGroup().addTo(map);
     mapRef.current = map;
     groupRef.current = group;
+    locationLayerRef.current = L.layerGroup().addTo(map);
 
     map.pm.addControls({
       position: "topleft",
@@ -114,11 +122,31 @@ export function PolygonEditor({ value, onChange }: PolygonEditorProps) {
       map.remove();
       mapRef.current = null;
       groupRef.current = null;
+      locationLayerRef.current = null;
     };
     // Intentionally run once: the map/group must persist across re-renders
     // (e.g. form validation errors) so drawn geometry is never wiped.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Recenter/mark the map whenever a geolocation fix comes back. Separate
+  // from the setup effect above so a location fix never rebuilds the map
+  // (which would risk losing the drawn polygon).
+  useEffect(() => {
+    const map = mapRef.current;
+    const locationLayer = locationLayerRef.current;
+    if (!map || !locationLayer || !geolocation.position) return;
+
+    locationLayer.clearLayers();
+    const { lat, lon, accuracyMeters } = geolocation.position;
+    L.marker([lat, lon]).addTo(locationLayer);
+    if (accuracyMeters) {
+      L.circle([lat, lon], { radius: accuracyMeters, color: "#2f6b3a", weight: 1, fillOpacity: 0.08 }).addTo(
+        locationLayer
+      );
+    }
+    map.setView([lat, lon], GEOLOCATION_ZOOM);
+  }, [geolocation.position]);
 
   function handleClear() {
     const group = groupRef.current;
@@ -127,15 +155,49 @@ export function PolygonEditor({ value, onChange }: PolygonEditorProps) {
     onChangeRef.current(null, null);
   }
 
+  function handleFitToPolygon() {
+    const map = mapRef.current;
+    const group = groupRef.current;
+    if (!map || !group) return;
+    const layers = group.getLayers();
+    if (layers.length === 0) return;
+    map.fitBounds(group.getBounds(), { maxZoom: 16, padding: [16, 16] });
+  }
+
+  const geolocationMessageKey: Record<typeof geolocation.status, string | null> = {
+    idle: null,
+    locating: "field.locating",
+    success: null,
+    denied: "field.locateDenied",
+    unavailable: "field.locateUnavailable",
+    unsupported: "field.locateUnsupported",
+  };
+  const geolocationMessage = geolocationMessageKey[geolocation.status];
+
   return (
     <div className="polygon-editor">
       <div ref={containerRef} className="polygon-editor__map" role="group" aria-label={t("field.mapLabel")} />
       <div className="row polygon-editor__actions">
+        <button
+          type="button"
+          className="button button--secondary"
+          onClick={geolocation.locate}
+          disabled={geolocation.status === "locating"}
+        >
+          {t("field.locateMe")}
+        </button>
+        <button type="button" className="button button--secondary" onClick={handleFitToPolygon}>
+          {t("field.fitToPolygon")}
+        </button>
         <button type="button" className="button button--secondary" onClick={handleClear}>
           {t("field.clearPolygon")}
         </button>
-        <p className="field-hint">{t("field.polygonHint")}</p>
       </div>
+      {geolocationMessage ? <p className="field-hint">{t(geolocationMessage)}</p> : null}
+      <p className="field-hint">{t("field.polygonHint")}</p>
+      {isSatelliteLayerConfigured ? (
+        <p className="field-hint">{t("field.satelliteGuidanceNotice")}</p>
+      ) : null}
     </div>
   );
 }

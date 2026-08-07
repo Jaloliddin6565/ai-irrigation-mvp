@@ -25,7 +25,7 @@ never be committed — see `docs/security.md`.
 | Satellite quality (live only) | `SATELLITE_LOOKBACK_DAYS`, `MIN_VALID_PIXEL_RATIO`, `MAX_SCENE_CLOUD_COVER`, `MAX_SATELLITE_OBSERVATION_AGE_DAYS` | |
 | HTTP client (live only) | `HTTP_TIMEOUT_SECONDS`, `HTTP_MAX_RETRIES`, `HTTP_RETRY_BASE_DELAY_SECONDS`, `HTTP_RETRY_MAX_DELAY_SECONDS`, `TOKEN_EXPIRY_MARGIN_SECONDS` | see `docs/architecture.md` "Shared HTTP/error/cache infrastructure" |
 | Caching (live only) | `WEATHER_CACHE_TTL_SECONDS`, `SATELLITE_CACHE_TTL_SECONDS` | in-memory, process-local — see `app/core/cache.py` |
-| Frontend | `VITE_API_BASE_URL`, `MAP_TILE_URL`/`VITE_MAP_TILE_URL`, `MAP_TILE_ATTRIBUTION`/`VITE_MAP_TILE_ATTRIBUTION` | |
+| Frontend | `VITE_API_BASE_URL`, `MAP_TILE_URL`/`VITE_MAP_TILE_URL`, `MAP_TILE_ATTRIBUTION`/`VITE_MAP_TILE_ATTRIBUTION`, `VITE_SATELLITE_TILE_URL`, `VITE_SATELLITE_TILE_ATTRIBUTION` | satellite vars optional, see below |
 
 ## Local setup — fixture mode (default, no credentials)
 
@@ -72,6 +72,17 @@ dev (defaults to `http://localhost:8000` if unset); `VITE_MAP_TILE_URL`/
 `VITE_MAP_TILE_ATTRIBUTION` only change the Leaflet basemap. None of the
 three are secrets, and no `VITE_`-prefixed CDSE/credential variable exists
 or should ever be added — see `docs/security.md`.
+
+`VITE_SATELLITE_TILE_URL`/`VITE_SATELLITE_TILE_ATTRIBUTION` are optional and
+blank by default — no satellite provider is bundled or assumed. Leaving them
+unset hides the field map's "Sun'iy yo'ldosh" base-layer toggle entirely
+(OSM stays the only base layer; no broken-tile state is reachable). If an
+operator wants satellite imagery on the field map, the value set here must
+be a key meant to be exposed in a browser (the common pattern for
+commercial tile providers: a public key restricted by HTTP referrer/domain
+in the provider's own dashboard), configured with this deployment's actual
+domain — never a server-side secret like the CDSE credentials above, and
+never committed to the repo.
 
 ## Docker
 
