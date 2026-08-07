@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import "../../i18n";
@@ -46,6 +47,20 @@ describe("SatelliteChart", () => {
 
     expect(screen.getByRole("button", { name: "NDVI" })).toBeInTheDocument();
     expect(screen.getByText("Sifat bo'yicha belgilangan kuzatuvlar")).toBeInTheDocument();
+  });
+
+  it("keeps NDVI/NDMI prominent and the other four indices reachable behind 'more indices'", async () => {
+    const user = userEvent.setup();
+    render(<SatelliteChart observations={[observation({ acquisition_date: "2026-05-01" })]} />);
+
+    expect(screen.getByRole("button", { name: "NDVI" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "NDMI" })).toBeInTheDocument();
+
+    await user.click(screen.getByText("Qo'shimcha indekslar"));
+    const ndreButton = screen.getByRole("button", { name: "NDRE" });
+    await user.click(ndreButton);
+
+    expect(screen.getByRole("img", { name: /NDRE/ })).toBeInTheDocument();
   });
 
   it("provides an accessible tabular alternative to the visual chart", () => {

@@ -49,4 +49,24 @@ describe("WaterBalanceChart", () => {
     expect(screen.getByRole("img", { name: /namlik kamayishi/ })).toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
   });
+
+  it("warns when depletion has been at/near TAW for an extended stretch", () => {
+    const rows = Array.from({ length: 6 }, (_, i) =>
+      row({ date: `2026-05-0${i + 1}`, taw_mm: 150, depletion_end_mm: 148 })
+    );
+    render(<WaterBalanceChart rows={rows} />);
+
+    expect(screen.getByText(/so'nggi 6 kun davomida TAW/)).toBeInTheDocument();
+  });
+
+  it("does not warn when depletion only briefly touches TAW", () => {
+    const rows = [
+      row({ date: "2026-05-01", taw_mm: 150, depletion_end_mm: 148 }),
+      row({ date: "2026-05-02", taw_mm: 150, depletion_end_mm: 40 }),
+      row({ date: "2026-05-03", taw_mm: 150, depletion_end_mm: 35 }),
+    ];
+    render(<WaterBalanceChart rows={rows} />);
+
+    expect(screen.queryByText(/TAW.*darajasida yoki unga yaqin/)).not.toBeInTheDocument();
+  });
 });

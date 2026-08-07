@@ -13,11 +13,17 @@ import {
 import { useTranslation } from "react-i18next";
 
 import "./SatelliteChart.css";
+import { CollapsibleSection } from "../disclosure/CollapsibleSection";
 import { formatDate, formatPercent } from "../../utils/format";
 import type { ParcelObservation } from "../../types/api";
 
-const INDEX_KEYS = ["ndvi", "ndmi", "msi", "ndre", "ndwi", "nbr2"] as const;
-type IndexKey = (typeof INDEX_KEYS)[number];
+// NDVI/NDMI stay prominent (the two indices farmers are actually shown by
+// default); MSI/NDRE/NDWI/NBR2 move into a collapsed "more indices"
+// section — all six remain fully available, just not given equal visual
+// weight (see docs/methodology.md and CLAUDE.md rule 4).
+const PRIMARY_INDEX_KEYS = ["ndvi", "ndmi"] as const;
+const SECONDARY_INDEX_KEYS = ["msi", "ndre", "ndwi", "nbr2"] as const;
+type IndexKey = (typeof PRIMARY_INDEX_KEYS)[number] | (typeof SECONDARY_INDEX_KEYS)[number];
 
 interface ChartPoint {
   date: string;
@@ -54,7 +60,7 @@ export function SatelliteChart({ observations }: { observations: ParcelObservati
   return (
     <div>
       <div className="row">
-        {INDEX_KEYS.map((key) => (
+        {PRIMARY_INDEX_KEYS.map((key) => (
           <button
             key={key}
             type="button"
@@ -65,6 +71,20 @@ export function SatelliteChart({ observations }: { observations: ParcelObservati
           </button>
         ))}
       </div>
+      <CollapsibleSection title={t("charts.moreIndices")}>
+        <div className="row">
+          {SECONDARY_INDEX_KEYS.map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={`button ${index === key ? "" : "button--secondary"}`}
+              onClick={() => setIndex(key)}
+            >
+              {t(`charts.index.${key}`)}
+            </button>
+          ))}
+        </div>
+      </CollapsibleSection>
       <p className="field-hint">{t(`charts.indexExplainer.${index}`)}</p>
 
       <div
