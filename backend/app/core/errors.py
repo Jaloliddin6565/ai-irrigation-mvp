@@ -5,6 +5,8 @@ errors consistently instead of guessing at ad-hoc formats.
 """
 
 import logging
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from fastapi import Request, status
 from fastapi.encoders import jsonable_encoder
@@ -149,7 +151,7 @@ def _field_name_from_loc(loc: tuple) -> str | None:
     return None
 
 
-def _constraint_suffix_uz(error: dict) -> str | None:
+def _constraint_suffix_uz(error: Mapping[str, Any]) -> str | None:
     """Uzbek phrasing for Pydantic's built-in Field(...) constraint types.
     Returns None for constraint types not worth a bespoke phrase — those
     fall back to the generic top-level banner instead of a wrong-sounding
@@ -197,7 +199,7 @@ def _field_errors_for_value_error(msg: str) -> list[FieldError] | None:
     return None
 
 
-def _translate_validation_errors(errors: list[dict]) -> list[FieldError]:
+def _translate_validation_errors(errors: Sequence[Mapping[str, Any]]) -> list[FieldError]:
     field_errors: list[FieldError] = []
     for error in errors:
         if error.get("type") == "value_error":
