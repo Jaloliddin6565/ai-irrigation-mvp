@@ -50,7 +50,7 @@ soils:
     uncertainty_factor: 0.7
 
   unknown:
-    label_uz: "Noma'lum"
+    label_uz: "Bilmayman / Aniq emas"
     field_capacity: 0.25
     wilting_point: 0.12
     uncertainty_factor: 1.0

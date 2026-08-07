@@ -24,6 +24,7 @@ from datetime import date
 from enum import StrEnum
 
 from app.domain.irrigation_normalization import IrrigationDepthSource, normalize_irrigation_event
+from app.domain.messages import Message
 from app.domain.water_balance import clamp, compute_effective_irrigation
 
 
@@ -54,6 +55,10 @@ class InitializationResult:
     # crop/soil uncertainty_factor config values.
     uncertainty: float
     warnings: list[str] = field(default_factory=list)
+    # Structured counterpart to warnings above — additive, warnings is
+    # unchanged and still carries every message (kept for the technical
+    # debug view).
+    warning_codes: list[Message] = field(default_factory=list)
 
 
 _QUANTITATIVE_KNOWN_AMOUNT_SOURCES = (
@@ -125,6 +130,13 @@ def determine_initialization(
             starting_depletion_mm=starting_depletion_mm,
             uncertainty=0.2 if is_direct else 0.35,
             warnings=warnings,
+            warning_codes=[
+                Message(
+                    code="initialized_from_recent_irrigation",
+                    text_en=warnings[-1],
+                    params={"anchor_date": anchor_date.isoformat(), "is_direct_amount": is_direct},
+                )
+            ],
         )
 
     days_since_planting = (analysis_date - planting_date).days
@@ -139,12 +151,33 @@ def determine_initialization(
                 f"capacity at planting_date ({planting_date.isoformat()}) and rolling "
                 "forward from there."
             ],
+            warning_codes=[
+                Message(
+                    code="no_recent_irrigation_record",
+                    text_en="No usable recent irrigation record.",
+                ),
+                Message(
+                    code="initialized_from_planting_date_assumption",
+                    text_en=(
+                        f"Assuming the field was near field capacity at planting_date "
+                        f"({planting_date.isoformat()}) and rolling forward from there."
+                    ),
+                    params={"planting_date": planting_date.isoformat()},
+                ),
+            ],
         )
 
     available_dates = sorted(weather_available_dates)
     if available_dates and available_dates[0] <= analysis_date:
         earliest = available_dates[0]
         starting_depletion_mm = conservative_default_fraction_of_raw * raw_at(earliest)
+        # The distinction below matters: planting_date is a required field,
+        # so reaching this branch never means it's missing — it means
+        # days_since_planting fell outside [0, max_anchor_age_days] (planted
+        # too long ago, or in the future relative to analysis_date). A
+        # pilot walkthrough found the old single English sentence here
+        # ("no in-window planting date") read as if no planting date had
+        # been entered at all — see docs/methodology.md and CLAUDE.md.
         return InitializationResult(
             method=InitializationMethod.CONSERVATIVE_DEFAULT,
             start_date=earliest,
@@ -156,6 +189,39 @@ def determine_initialization(
                 f"{earliest.isoformat()} (earliest available weather data) as a conservative "
                 "default. Confidence is reduced."
             ],
+            warning_codes=[
+                Message(
+                    code="no_recent_irrigation_record",
+                    text_en="No usable recent irrigation record.",
+                ),
+                Message(
+                    code="planting_date_outside_anchor_window",
+                    text_en=(
+                        f"planting_date ({planting_date.isoformat()}) is outside the "
+                        f"{max_anchor_age_days}-day anchor window relative to analysis_date "
+                        f"({analysis_date.isoformat()})."
+                    ),
+                    params={
+                        "planting_date": planting_date.isoformat(),
+                        "days_since_planting": days_since_planting,
+                        "max_anchor_age_days": max_anchor_age_days,
+                    },
+                ),
+                Message(
+                    code="conservative_default_initialization",
+                    text_en=(
+                        f"Initializing at {conservative_default_fraction_of_raw * 100:.0f}% of "
+                        f"RAW on {earliest.isoformat()} (earliest available weather data) as a "
+                        "conservative default. Confidence is reduced."
+                    ),
+                    params={
+                        "fraction_of_raw_percent": round(
+                            conservative_default_fraction_of_raw * 100
+                        ),
+                        "start_date": earliest.isoformat(),
+                    },
+                ),
+            ],
         )
 
     return InitializationResult(
@@ -163,6 +229,15 @@ def determine_initialization(
         start_date=None,
         starting_depletion_mm=None,
         uncertainty=1.0,
+        warning_codes=[
+            Message(
+                code="insufficient_data_initialization",
+                text_en=(
+                    "Insufficient data to initialize the water balance: no recent irrigation "
+                    "record, no in-window planting date, and no usable weather history."
+                ),
+            )
+        ],
         warnings=[
             "Insufficient data to initialize the water balance: no recent irrigation record, "
             "no in-window planting date, and no usable weather history."

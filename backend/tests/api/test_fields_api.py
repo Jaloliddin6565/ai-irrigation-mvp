@@ -100,6 +100,22 @@ def test_create_field_with_self_intersecting_polygon_returns_422(db_client: Test
     assert response.json()["code"] == "invalid_geometry"
 
 
+def test_create_field_with_self_intersecting_polygon_returns_field_error_for_polygon(
+    db_client: TestClient,
+) -> None:
+    farmer_id = _create_farmer(db_client)
+    bowtie = {"type": "Polygon", "coordinates": [[[0, 0], [1, 1], [1, 0], [0, 1], [0, 0]]]}
+    payload = _field_payload(farmer_id, geojson_polygon=bowtie)
+
+    response = db_client.post("/api/fields", json=payload)
+
+    body = response.json()
+    assert body["field_errors"] is not None
+    assert len(body["field_errors"]) == 1
+    assert body["field_errors"][0]["field"] == "geojson_polygon"
+    assert body["field_errors"][0]["message_uz"] == body["message_uz"]
+
+
 def test_create_field_with_invalid_dates_returns_422(db_client: TestClient) -> None:
     farmer_id = _create_farmer(db_client)
     payload = _field_payload(
@@ -109,6 +125,83 @@ def test_create_field_with_invalid_dates_returns_422(db_client: TestClient) -> N
     response = db_client.post("/api/fields", json=payload)
 
     assert response.status_code == 422
+
+
+def test_create_field_with_invalid_dates_returns_field_error_on_harvest_date(
+    db_client: TestClient,
+) -> None:
+    farmer_id = _create_farmer(db_client)
+    payload = _field_payload(
+        farmer_id, planting_date="2026-04-01", expected_harvest_date="2026-03-01"
+    )
+
+    response = db_client.post("/api/fields", json=payload)
+
+    body = response.json()
+    assert body["field_errors"] is not None
+    fields_flagged = {entry["field"] for entry in body["field_errors"]}
+    assert fields_flagged == {"expected_harvest_date"}
+
+
+def test_create_field_with_wilting_point_zero_returns_field_error_not_only_generic_banner(
+    db_client: TestClient,
+) -> None:
+    """Regression: an accidentally-entered 0 (e.g. from a numeric spinner's
+    up-arrow on an empty min="0" input) used to surface only the generic
+    "Kiritilgan ma'lumotlarda xatolik bor." banner with no field identified.
+    The response must now name wilting_point_override specifically."""
+    farmer_id = _create_farmer(db_client)
+    payload = _field_payload(farmer_id, wilting_point_override=0)
+
+    response = db_client.post("/api/fields", json=payload)
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "validation_error"
+    assert body["field_errors"] is not None
+    fields_flagged = {entry["field"] for entry in body["field_errors"]}
+    assert "wilting_point_override" in fields_flagged
+    wilting_point_error = next(
+        e for e in body["field_errors"] if e["field"] == "wilting_point_override"
+    )
+    assert "0" in wilting_point_error["message_uz"]
+    assert "So'lish nuqtasi" in wilting_point_error["message_uz"]
+
+
+def test_create_field_with_blank_optional_overrides_is_accepted(db_client: TestClient) -> None:
+    """Regression: optional numeric overrides sent as null (never 0) must be
+    accepted — this is the correct counterpart to the 0-rejection test
+    above."""
+    farmer_id = _create_farmer(db_client)
+    payload = _field_payload(
+        farmer_id,
+        root_depth_override=None,
+        field_capacity_override=None,
+        wilting_point_override=None,
+    )
+
+    response = db_client.post("/api/fields", json=payload)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["wilting_point_override"] is None
+
+
+def test_create_field_with_invalid_override_ordering_returns_field_errors_for_both_fields(
+    db_client: TestClient,
+) -> None:
+    farmer_id = _create_farmer(db_client)
+    payload = _field_payload(
+        farmer_id, field_capacity_override=0.1, wilting_point_override=0.2
+    )
+
+    response = db_client.post("/api/fields", json=payload)
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["field_errors"] is not None
+    fields_flagged = {entry["field"] for entry in body["field_errors"]}
+    assert fields_flagged == {"field_capacity_override", "wilting_point_override"}
 
 
 def test_get_field_by_id(db_client: TestClient) -> None:
@@ -185,6 +278,15 @@ def test_update_field_with_invalid_dates_returns_422_and_leaves_field_unchanged(
         f"/api/fields/{created['id']}", json={"expected_harvest_date": "2026-01-01"}
     )
     assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "invalid_dates"
+    assert body["field_errors"] == [
+        {
+            "field": "expected_harvest_date",
+            "code": "invalid_dates",
+            "message_uz": "Hosil yig'ish sanasi ekish sanasidan keyin bo'lishi kerak.",
+        }
+    ]
 
     unchanged = db_client.get(f"/api/fields/{created['id']}").json()
     assert unchanged["expected_harvest_date"] is None

@@ -157,7 +157,8 @@ class RecommendationDefaultsConfig(BaseModel):
     status_thresholds: RecommendationStatusThresholds
     forecast_rain: ForecastRainDefaults
     recommended_range: RecommendedRangeDefaults
-    uncertainty_range_padding_fraction: float
+    uncertainty_range_padding_fraction_medium: float
+    uncertainty_range_padding_fraction_low: float
 
 
 class ConfidenceThresholds(BaseModel):
