@@ -207,7 +207,9 @@ def _resolution_degrees_for_polygon(
     if longitude_scale < MIN_LONGITUDE_SCALE:
         raise UnsupportedGeometryError(
             provider=PROVIDER_NAME,
-            message_en="Parcel latitude is too close to a pole for EPSG:4326 resolution conversion.",
+            message_en=(
+                "Parcel latitude is too close to a pole for EPSG:4326 resolution conversion."
+            ),
             message_uz="Dala koordinatasi qutbga juda yaqin; statistik hisoblash bajarilmadi.",
         )
 
