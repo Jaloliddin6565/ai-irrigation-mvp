@@ -18,9 +18,8 @@ export function DataSourcePanel({
   const { t } = useTranslation();
 
   return (
-    <section className="card">
+    <div>
       <div className="row data-source-panel__header">
-        <h2>{t("dataSource.title")}</h2>
         <DataModeBadge mode={dataMode} />
       </div>
 
@@ -86,6 +85,6 @@ export function DataSourcePanel({
           </dl>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
