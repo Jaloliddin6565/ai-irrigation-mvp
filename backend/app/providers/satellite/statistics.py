@@ -40,19 +40,33 @@ work end to end against the real API.
 The full field polygon (never a centroid or an arbitrary bounding box) is
 sent as the aggregation geometry, so returned percentiles/mean/std describe
 the whole parcel.
+
+Spatial resolution note: the request geometry is WGS84 / EPSG:4326, so the
+Statistical API's ``resx``/``resy`` values are expressed in degrees, not
+metres. We therefore convert the desired ~10 m Sentinel-2 sampling resolution
+to degree resolution at the parcel latitude instead of sending ``10`` (which
+would mean roughly ten degrees per pixel).
 """
 
+import logging
 import math
 from dataclasses import dataclass
 from datetime import date, datetime
+
+import httpx
 
 from app.core.http_client import RetryingHttpClient
 from app.core.provider_errors import ProviderMalformedResponseError, UnsupportedGeometryError
 from app.providers.satellite.cdse_auth import CdseTokenClient
 from app.providers.satellite.scl import build_scl_exclusion_js_array
 
+logger = logging.getLogger(__name__)
+
 PROVIDER_NAME = "cdse-statistics"
 COLLECTION = "sentinel-2-l2a"
+TARGET_RESOLUTION_METERS = 10.0
+METERS_PER_DEGREE_LATITUDE = 111_320.0
+MIN_LONGITUDE_SCALE = 1e-6
 
 INDEX_NAMES = ("ndvi", "ndmi", "ndre", "msi", "ndwi", "nbr2")
 
@@ -126,6 +140,110 @@ def _is_finite(value: float) -> bool:
     return not (math.isnan(value) or math.isinf(value))
 
 
+def _polygon_reference_latitude(polygon: dict) -> float:
+    """Return a stable representative latitude for WGS84 resolution conversion."""
+    coordinates = polygon.get("coordinates")
+    if not isinstance(coordinates, list) or not coordinates:
+        raise UnsupportedGeometryError(
+            provider=PROVIDER_NAME,
+            message_en="Statistical API polygon is missing coordinates.",
+            message_uz="Statistik hisoblash uchun dala koordinatalari topilmadi.",
+        )
+
+    exterior_ring = coordinates[0]
+    if not isinstance(exterior_ring, list) or not exterior_ring:
+        raise UnsupportedGeometryError(
+            provider=PROVIDER_NAME,
+            message_en="Statistical API polygon exterior ring is empty.",
+            message_uz="Dala chegarasi koordinatalari bo'sh.",
+        )
+
+    latitudes: list[float] = []
+    for point in exterior_ring:
+        if not isinstance(point, (list, tuple)) or len(point) < 2:
+            raise UnsupportedGeometryError(
+                provider=PROVIDER_NAME,
+                message_en="Statistical API polygon contains an invalid coordinate.",
+                message_uz="Dala chegarasida noto'g'ri koordinata mavjud.",
+            )
+        lon, lat = point[0], point[1]
+        if not isinstance(lon, (int, float)) or not isinstance(lat, (int, float)):
+            raise UnsupportedGeometryError(
+                provider=PROVIDER_NAME,
+                message_en="Statistical API polygon coordinates must be numeric.",
+                message_uz="Dala chegarasi koordinatalari son bo'lishi kerak.",
+            )
+        if not math.isfinite(float(lon)) or not math.isfinite(float(lat)):
+            raise UnsupportedGeometryError(
+                provider=PROVIDER_NAME,
+                message_en="Statistical API polygon contains non-finite coordinates.",
+                message_uz="Dala chegarasida yaroqsiz koordinata mavjud.",
+            )
+        if not -90.0 <= float(lat) <= 90.0:
+            raise UnsupportedGeometryError(
+                provider=PROVIDER_NAME,
+                message_en="Statistical API polygon latitude is outside WGS84 bounds.",
+                message_uz="Dala koordinatasi WGS84 kenglik chegarasidan tashqarida.",
+            )
+        latitudes.append(float(lat))
+
+    return (min(latitudes) + max(latitudes)) / 2.0
+
+
+def _resolution_degrees_for_polygon(
+    polygon: dict, resolution_meters: float = TARGET_RESOLUTION_METERS
+) -> tuple[float, float]:
+    """Convert a metre target resolution to EPSG:4326 degree resolution.
+
+    The approximation is intentionally lightweight and appropriate for parcel-scale
+    MVP use in Uzbekistan. It avoids adding a projection dependency while keeping
+    the request geometry and declared CRS consistent.
+    """
+    if resolution_meters <= 0 or not math.isfinite(resolution_meters):
+        raise ValueError("resolution_meters must be a finite positive number")
+
+    reference_latitude = _polygon_reference_latitude(polygon)
+    longitude_scale = abs(math.cos(math.radians(reference_latitude)))
+    if longitude_scale < MIN_LONGITUDE_SCALE:
+        raise UnsupportedGeometryError(
+            provider=PROVIDER_NAME,
+            message_en=(
+                "Parcel latitude is too close to a pole for EPSG:4326 resolution conversion."
+            ),
+            message_uz="Dala koordinatasi qutbga juda yaqin; statistik hisoblash bajarilmadi.",
+        )
+
+    resy = resolution_meters / METERS_PER_DEGREE_LATITUDE
+    resx = resolution_meters / (METERS_PER_DEGREE_LATITUDE * longitude_scale)
+    return resx, resy
+
+
+def _safe_provider_error_summary(response: httpx.Response) -> str | None:
+    """Extract only non-sensitive CDSE error fields for server logs."""
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+
+    candidate = payload.get("error", payload)
+    if not isinstance(candidate, dict):
+        return None
+
+    parts: list[str] = []
+    for key in ("code", "reason", "message"):
+        value = candidate.get(key)
+        if isinstance(value, (str, int, float)):
+            text = str(value).strip()
+            if text:
+                parts.append(f"{key}={text}")
+
+    if not parts:
+        return None
+    return "; ".join(parts)[:500]
+
+
 class CdseStatisticsClient:
     def __init__(
         self,
@@ -158,6 +276,7 @@ class CdseStatisticsClient:
                 message_uz="Statistik hisoblash uchun GeoJSON Polygon geometriyasi kerak.",
             )
 
+        resx, resy = _resolution_degrees_for_polygon(polygon)
         request_body = {
             "input": {
                 "bounds": {
@@ -173,8 +292,8 @@ class CdseStatisticsClient:
                 },
                 "aggregationInterval": {"of": "P1D"},
                 "evalscript": build_evalscript(),
-                "resx": 10,
-                "resy": 10,
+                "resx": resx,
+                "resy": resy,
             },
             "calculations": {
                 index: {"statistics": {"default": {"percentiles": {"k": [25, 50, 75]}}}}
@@ -194,6 +313,18 @@ class CdseStatisticsClient:
             )
 
         if response.status_code != 200:
+            summary = _safe_provider_error_summary(response)
+            if summary:
+                logger.warning(
+                    "CDSE Statistical API returned HTTP %s: %s",
+                    response.status_code,
+                    summary,
+                )
+            else:
+                logger.warning(
+                    "CDSE Statistical API returned HTTP %s with no structured error detail",
+                    response.status_code,
+                )
             raise ProviderMalformedResponseError(
                 provider=PROVIDER_NAME,
                 message_en=f"Statistical API returned HTTP {response.status_code}.",
