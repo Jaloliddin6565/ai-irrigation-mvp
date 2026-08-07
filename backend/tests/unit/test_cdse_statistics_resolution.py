@@ -1,4 +1,4 @@
-import math
+import math  # noqa: I001
 
 import httpx
 import pytest
