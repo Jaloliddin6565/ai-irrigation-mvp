@@ -1,4 +1,4 @@
-import type { ApiErrorBody } from "../types/api";
+import type { ApiErrorBody, ApiFieldError } from "../types/api";
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 const API_BASE_URL = configuredApiBaseUrl || window.location.origin;
@@ -14,6 +14,7 @@ export class ApiError extends Error {
   public messageUz: string;
   public messageEn: string | null;
   public details: Record<string, unknown> | null;
+  public fieldErrors: ApiFieldError[] | null;
 
   constructor(status: number, body: ApiErrorBody) {
     super(body.message_en ?? body.message_uz);
@@ -23,6 +24,7 @@ export class ApiError extends Error {
     this.messageUz = body.message_uz;
     this.messageEn = body.message_en ?? null;
     this.details = body.details ?? null;
+    this.fieldErrors = body.field_errors ?? null;
   }
 }
 
