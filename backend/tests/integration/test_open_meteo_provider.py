@@ -45,6 +45,8 @@ def _daily_payload(dates: list[str], et0: list, precip: list) -> dict:
             "precipitation_sum": precip,
             "temperature_2m_max": [30.0] * len(dates),
             "temperature_2m_min": [15.0] * len(dates),
+            "temperature_2m_mean": [22.0] * len(dates),
+            "relative_humidity_2m_mean": [50.0] * len(dates),
             "wind_speed_10m_max": [2.0] * len(dates),
             "shortwave_radiation_sum": [20.0] * len(dates),
         }

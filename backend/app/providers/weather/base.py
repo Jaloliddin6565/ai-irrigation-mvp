@@ -14,6 +14,15 @@ class DailyWeather(BaseModel):
     precipitation_probability_pct: float
     temperature_max_c: float
     temperature_min_c: float
+    # temperature_mean_c/relative_humidity_mean_pct: added in Phase 2 for the
+    # AI Soil Wetness Index feature vector (app/ai/inference.py), which needs
+    # the exact same variables the Phase 1.1 training pipeline used
+    # (app/ai/dataset.py). Fetched in the SAME Open-Meteo request the
+    # water-balance engine already makes (see open_meteo.py _VAR_MAP) — not
+    # an extra API call — so nothing here changes what water_balance.py
+    # itself consumes (still only et0_mm/precipitation_mm).
+    temperature_mean_c: float
+    relative_humidity_mean_pct: float
     wind_speed_ms: float
     shortwave_radiation_mj_m2: float
 

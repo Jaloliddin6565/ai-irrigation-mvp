@@ -187,6 +187,28 @@ class ConfidenceWeightsConfig(BaseModel):
     caps: ConfidenceCaps
 
 
+class WetnessCategoryThresholds(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    dry_max: float
+    moderate_max: float
+
+
+class AIConfidenceAdjustment(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    agree_bonus: float
+    disagree_penalty: float
+
+
+class AIEvidenceConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    methodology_version: str
+    wetness_categories: WetnessCategoryThresholds
+    confidence_adjustment: AIConfidenceAdjustment
+
+
 class AgronomicConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -196,6 +218,7 @@ class AgronomicConfig(BaseModel):
     water_balance_defaults: WaterBalanceDefaultsConfig
     recommendation_defaults: RecommendationDefaultsConfig
     confidence_weights: ConfidenceWeightsConfig
+    ai_evidence: AIEvidenceConfig
 
 
 def _read_yaml(path: Path) -> dict:
@@ -219,6 +242,7 @@ def load_agronomic_config(config_dir: Path) -> AgronomicConfig:
         confidence_weights=ConfidenceWeightsConfig.model_validate(
             _read_yaml(config_dir / "confidence_weights.yaml")
         ),
+        ai_evidence=AIEvidenceConfig.model_validate(_read_yaml(config_dir / "ai_evidence.yaml")),
     )
 
 

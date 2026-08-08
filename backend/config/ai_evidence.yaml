@@ -1,0 +1,36 @@
+# AI Soil Wetness Index evidence-layer configuration (Phase 2).
+#
+# GENERIC PLACEHOLDER VALUES pending Uzbekistan field validation — same
+# caveat as every other file in this directory (CLAUDE.md rule 2). None of
+# this feeds into recommended_min_mm/max_mm, the irrigation window, TAW,
+# RAW, or FAO depletion — see CLAUDE.md and app/domain/ai_agreement.py.
+
+methodology_version: "0.1.0"
+
+# Fixed thirds of the AI Soil Wetness Index's own [0, 1] location-relative
+# range (see app/ai/features.py wetness_index_from_value). Chosen over
+# percentile/quantile buckets because they stay tied to the index's own
+# definition (thirds of a location's OWN observed historical range) rather
+# than to whatever distribution a particular sample happens to contain.
+# Verified against the full 16,005-row Phase 1.1 training set before
+# picking these: the distribution is right-skewed (mean 0.331,
+# median 0.274; these equal-width buckets give dry/moderate/wet counts of
+# roughly 54% / 33% / 13%). That skew is an expected property of
+# Uzbekistan's irrigated-but-frequently-depleted soil regime relative to
+# each location's own wettest observed extreme — not a bucketing defect —
+# so it is kept rather than "corrected" with a distribution-chasing
+# percentile split.
+wetness_categories:
+  dry_max: 0.33
+  moderate_max: 0.66
+
+# Capped, modest confidence-score adjustment applied only when both an AI
+# signal and an FAO signal are available and either clearly agree or
+# clearly disagree (see app/domain/ai_agreement.py AgreementStatus).
+# "partial" agreement and "unavailable" apply no adjustment. See
+# app/domain/confidence.py apply_ai_agreement_adjustment for the additional
+# same-tier-only safety cap that stops an "agree" bonus alone from ever
+# promoting a non-high confidence result all the way to "high".
+confidence_adjustment:
+  agree_bonus: 0.05
+  disagree_penalty: 0.08

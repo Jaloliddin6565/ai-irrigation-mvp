@@ -7,7 +7,7 @@ is a documented heuristic scoring formula — see docs/methodology.md — never
 a trained model's probability estimate, and never described as one.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from app.domain.initialization import InitializationMethod, InitializationResult
 from app.domain.satellite_adjustment import SatelliteAdjustmentResult, SatelliteDataQuality
@@ -218,3 +218,66 @@ def compute_confidence(
         strong_factors=strong_factors,
         weak_factors=weak_factors,
     )
+
+
+# Keeps an AI "agree" bonus from landing exactly ON the high threshold
+# (which would count as "high" — see the >= comparison below).
+_AI_SAME_TIER_SAFETY_MARGIN = 0.001
+
+
+def apply_ai_agreement_adjustment(
+    confidence_result: ConfidenceResult,
+    *,
+    agreement_status: str,
+    agree_bonus: float,
+    disagree_penalty: float,
+    high_threshold: float,
+    medium_threshold: float,
+) -> ConfidenceResult:
+    """Conservative, capped adjustment layered on top of an already-computed
+    FAO-only ConfidenceResult (see compute_confidence above) — a Phase 2
+    additive evidence layer, never a redesign of confidence itself. Only
+    score/category change; factor_scores, weights, triggered_caps, and
+    strong/weak_factors are carried over unchanged because they describe
+    the FAO-only evidence, not this AI evidence layer.
+
+    Bonuses/penalties come from backend/config/ai_evidence.yaml
+    confidence_adjustment and apply only for "agree"/"disagree"
+    (app/domain/ai_agreement.py AgreementStatus) — "partial" and
+    "unavailable" leave the result untouched.
+
+    Safety rule (CLAUDE.md / PHASE 2 section 6): an "agree" bonus alone can
+    never promote a non-high category all the way to "high" — the generic
+    public-data AI model must never turn low/medium confidence into falsely
+    high confidence by itself. A "disagree" penalty has no such floor: it
+    is always allowed to lower the score/category further, since a
+    corroborating AI signal is inherently weaker evidence than a
+    contradicting one is a warning sign.
+
+    This function is never used as an input to app/domain/recommendation.py
+    — the recommendation range is always computed from the pre-adjustment
+    ConfidenceResult, so AI evidence can never indirectly widen/narrow
+    recommended_min_mm/max_mm through the confidence-driven uncertainty
+    padding. See app/services/analysis.py for the call ordering that
+    enforces this.
+    """
+    if agreement_status == "agree":
+        delta = agree_bonus
+    elif agreement_status == "disagree":
+        delta = -disagree_penalty
+    else:  # "partial" or "unavailable": no adjustment
+        return confidence_result
+
+    adjusted_score = clamp(confidence_result.score + delta, 0.0, 1.0)
+
+    if delta > 0 and confidence_result.category != "high" and adjusted_score >= high_threshold:
+        adjusted_score = high_threshold - _AI_SAME_TIER_SAFETY_MARGIN
+
+    if adjusted_score >= high_threshold:
+        category = "high"
+    elif adjusted_score >= medium_threshold:
+        category = "medium"
+    else:
+        category = "low"
+
+    return replace(confidence_result, score=adjusted_score, category=category)
