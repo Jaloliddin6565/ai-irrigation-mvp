@@ -94,6 +94,32 @@ describe("AiSummaryCard", () => {
     expect(modelInfoDetails).not.toHaveAttribute("open");
   });
 
+  it.each([
+    ["partial", "Qisman mos"],
+    ["disagree", "Mos emas"],
+    ["unavailable", "AI ma'lumoti mavjud emas"],
+  ] as const)("shows the Uzbek label for a %s FAO-AI agreement badge", (agreement, label) => {
+    render(
+      <AiSummaryCard aiSummary={{ ...availableSummary, agreement_with_fao: agreement }} confidenceCategory="high" />
+    );
+
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["moderate", "O'rtacha"],
+    ["wet", "Nam"],
+  ] as const)("shows the Uzbek label for a %s wetness category badge", (category, label) => {
+    render(
+      <AiSummaryCard
+        aiSummary={{ ...availableSummary, wetness_category: category }}
+        confidenceCategory="high"
+      />
+    );
+
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
   it("shows a plain unavailable notice instead of a broken card when status is unavailable", () => {
     render(<AiSummaryCard aiSummary={unavailableSummary} confidenceCategory="medium" />);
 

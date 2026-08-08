@@ -46,6 +46,17 @@ build-backend = "setuptools.build_meta"
 where = ["."]
 include = ["app*"]
 
+# Without this, `pip install .` silently drops app/ai/artifacts/**/*.json
+# (setuptools only packages .py files by default) — the trained model
+# artifact AISoilMoistureProxyModel.load() needs at runtime. Missing
+# artifacts degrade gracefully to ai_summary.status="unavailable" rather
+# than crashing (see app/ai/inference.py), but that would silently disable
+# the AI evidence layer in every deployed environment that installs via
+# `pip install .` (Docker/Render), not just locally where the source tree
+# is used directly.
+[tool.setuptools.package-data]
+"app.ai" = ["artifacts/**/*.json"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
