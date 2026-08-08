@@ -40,6 +40,8 @@ _VAR_MAP = {
     "precipitation_sum": "precipitation_mm",
     "temperature_2m_max": "temperature_max_c",
     "temperature_2m_min": "temperature_min_c",
+    "temperature_2m_mean": "temperature_mean_c",
+    "relative_humidity_2m_mean": "relative_humidity_mean_pct",
     "wind_speed_10m_max": "wind_speed_ms",
     "shortwave_radiation_sum": "shortwave_radiation_mj_m2",
 }
@@ -203,6 +205,11 @@ class OpenMeteoProvider:
                 "start_date": start.isoformat(),
                 "end_date": end.isoformat(),
                 "daily": ",".join(daily_vars),
+                # Matches app/ai/dataset.py's bootstrap-training collection
+                # request exactly, so a live wind_speed_ms value is in the
+                # same unit the AI Soil Wetness Index model was trained on
+                # (Open-Meteo defaults to km/h otherwise).
+                "wind_speed_unit": "ms",
                 "timezone": self._timezone,
             },
         )
@@ -279,6 +286,14 @@ class OpenMeteoProvider:
                     message_en=f"Open-Meteo returned a negative ET0/precipitation value for {d}.",
                     message_uz="Open-Meteo manfiy qiymat qaytardi.",
                 )
+            if not (0.0 <= values["relative_humidity_mean_pct"] <= 100.0):
+                raise ProviderMalformedResponseError(
+                    provider=PROVIDER_NAME,
+                    message_en=(
+                        f"Open-Meteo returned an out-of-range relative humidity value for {d}."
+                    ),
+                    message_uz="Open-Meteo noto'g'ri namlik qiymatini qaytardi.",
+                )
 
             if (
                 probability_series is not None
@@ -298,6 +313,8 @@ class OpenMeteoProvider:
                     precipitation_probability_pct=probability_pct,
                     temperature_max_c=values["temperature_max_c"],
                     temperature_min_c=values["temperature_min_c"],
+                    temperature_mean_c=values["temperature_mean_c"],
+                    relative_humidity_mean_pct=values["relative_humidity_mean_pct"],
                     wind_speed_ms=values["wind_speed_ms"],
                     shortwave_radiation_mj_m2=values["shortwave_radiation_mj_m2"],
                 )

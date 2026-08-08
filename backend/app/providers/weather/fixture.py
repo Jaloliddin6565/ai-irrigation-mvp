@@ -68,6 +68,8 @@ class FixtureWeatherProvider:
                     precipitation_probability_pct=source.precipitation_probability_pct,
                     temperature_max_c=source.temperature_max_c,
                     temperature_min_c=source.temperature_min_c,
+                    temperature_mean_c=source.temperature_mean_c,
+                    relative_humidity_mean_pct=source.relative_humidity_mean_pct,
                     wind_speed_ms=source.wind_speed_ms,
                     shortwave_radiation_mj_m2=source.shortwave_radiation_mj_m2,
                 )

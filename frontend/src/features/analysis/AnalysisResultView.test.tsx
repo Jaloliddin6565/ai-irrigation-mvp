@@ -124,11 +124,27 @@ const analysis: AnalysisResponse = {
     strong_factors: ["weather_data_availability"],
     weak_factors: [],
   },
+  ai_summary: {
+    model_name: "AI Soil Wetness Index",
+    model_version: "ai_soil_wetness_index_v0.1",
+    status: "available",
+    wetness_index: 0.32,
+    wetness_category: "dry",
+    agreement_with_fao: "agree",
+    agreement_reason_code: "fao_dry_ai_dry",
+    confidence_effect: "agree_bonus",
+    data_basis: "public_model_precalibration",
+    validation_status: "not_sensor_validated",
+    feature_timestamp: "2026-06-01",
+    reasons: ["7-day cumulative precipitation: 0.0mm."],
+    warnings: [],
+    limitations: ["This is a LOCATION-RELATIVE index..."],
+  },
   warnings: ["Some raw English technical warning aggregated from a sub-stage."],
   disclaimer_uz: "Ushbu tavsiya masofaviy ma'lumotlar...",
 };
 
-function renderView() {
+function renderViewWith(analysisOverride: AnalysisResponse) {
   installFetchMock([
     {
       method: "GET",
@@ -146,9 +162,13 @@ function renderView() {
   ]);
   return render(
     <QueryClientProvider client={testQueryClient()}>
-      <AnalysisResultView analysis={analysis} />
+      <AnalysisResultView analysis={analysisOverride} />
     </QueryClientProvider>
   );
+}
+
+function renderView() {
+  return renderViewWith(analysis);
 }
 
 describe("AnalysisResultView", () => {
@@ -185,5 +205,37 @@ describe("AnalysisResultView", () => {
     const rawWarningText = "Some raw English technical warning aggregated from a sub-stage.";
     const element = screen.getByText(rawWarningText);
     expect(element.closest("details")).not.toBeNull();
+  });
+
+  it("shows the AI tahlili card and the data sources summary alongside the recommendation", () => {
+    renderView();
+
+    expect(screen.getByText("AI tahlili")).toBeInTheDocument();
+    expect(screen.getByText("Foydalanilgan ma'lumot manbalari")).toBeInTheDocument();
+    expect(screen.getByText("Yaqin kunlarda sug'oring")).toBeInTheDocument();
+  });
+
+  it("keeps the primary recommendation identical when the AI summary is unavailable", () => {
+    renderViewWith({
+      ...analysis,
+      ai_summary: {
+        ...analysis.ai_summary,
+        status: "unavailable",
+        wetness_index: null,
+        wetness_category: null,
+        agreement_with_fao: "unavailable",
+        confidence_effect: "none",
+      },
+    });
+
+    expect(
+      screen.getByText(
+        "AI tahlili hozir mavjud emas. Sug'orish tavsiyasi FAO-56 suv balansi asosida hisoblandi."
+      )
+    ).toBeInTheDocument();
+    // The primary FAO-56 recommendation renders exactly as it would with AI
+    // available — CLAUDE.md / PHASE 2 section 5: AI never controls this.
+    expect(screen.getByText("Yaqin kunlarda sug'oring")).toBeInTheDocument();
+    expect(screen.getByText(/20,0 mm.*26,0 mm/)).toBeInTheDocument();
   });
 });

@@ -16,6 +16,16 @@ dependencies = [
     "shapely>=2.0,<3.0",
     "pyproj>=3.6,<4.0",
     "email-validator>=2.2,<3.0",
+    # xgboost>=3.0 required: the 2.x sklearn wrapper's save_model() is
+    # incompatible with scikit-learn>=1.6's estimator-tag API
+    # (`_estimator_type` TypeError).
+    "xgboost>=3.0,<4.0",
+    # Required by xgboost's sklearn-compatible XGBRegressor API (app/ai/model.py).
+    "scikit-learn>=1.4,<2.0",
+    # Upper-bounded below 2.2: numpy 2.2+ ships .pyi stubs using unconditional
+    # PEP 695 `type` statements, which mypy cannot parse under this
+    # project's `python_version = "3.11"` setting (see [tool.mypy]).
+    "numpy>=1.26,<2.2",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +45,17 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
+
+# Without this, `pip install .` silently drops app/ai/artifacts/**/*.json
+# (setuptools only packages .py files by default) — the trained model
+# artifact AISoilMoistureProxyModel.load() needs at runtime. Missing
+# artifacts degrade gracefully to ai_summary.status="unavailable" rather
+# than crashing (see app/ai/inference.py), but that would silently disable
+# the AI evidence layer in every deployed environment that installs via
+# `pip install .` (Docker/Render), not just locally where the source tree
+# is used directly.
+[tool.setuptools.package-data]
+"app.ai" = ["artifacts/**/*.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

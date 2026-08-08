@@ -41,6 +41,12 @@ class Analysis(Base):
     water_balance_summary: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     recommendation: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     confidence: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # Phase 2 addition, nullable for backward compatibility with rows written
+    # before this column existed — _response_from_orm (app/services/analysis.py)
+    # synthesizes a status="unavailable" AISummarySchema for those rows rather
+    # than recomputing them with a newer AI model (CLAUDE.md/PHASE 2 section 11:
+    # persisted analyses must stay reproducible, never silently re-scored).
+    ai_summary: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     warnings: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
     calculation_version: Mapped[str] = mapped_column(String(20), nullable=False)
 

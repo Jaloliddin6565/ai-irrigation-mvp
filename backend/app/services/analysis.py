@@ -12,17 +12,25 @@ methodology_version for the agronomic VALUES, which is a separate concern
 (see docs/methodology.md).
 """
 
+import logging
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.inference import AIInferenceResult, run_ai_inference
 from app.core.errors import AppError
 from app.db.models.analysis import Analysis
 from app.db.models.enums import AnalysisDataMode, IrrigationMethod
 from app.db.models.field import Field
 from app.db.models.irrigation_event import IrrigationEvent
-from app.domain.confidence import compute_confidence
+from app.domain.ai_agreement import (
+    AgreementResult,
+    AgreementStatus,
+    determine_agreement,
+    fao_dryness_signal_from_ratio,
+)
+from app.domain.confidence import apply_ai_agreement_adjustment, compute_confidence
 from app.domain.config_loader import CropProfile, SoilProfile, get_agronomic_config
 from app.domain.crop_stage import CropGrowthStage, determine_crop_stage
 from app.domain.initialization import (
@@ -47,6 +55,7 @@ from app.domain.water_balance import (
 from app.providers.factory import get_satellite_provider, get_weather_provider
 from app.repositories import analyses as analyses_repo
 from app.schemas.analysis import (
+    AISummarySchema,
     AnalysisListItem,
     AnalysisListResponse,
     AnalysisResponse,
@@ -64,7 +73,20 @@ from app.schemas.analysis import (
 from app.services.fields import get_field_or_404
 from app.settings import get_settings
 
+logger = logging.getLogger("app.services.analysis")
+
 ANALYSIS_METHODOLOGY_VERSION = "0.3.0"
+
+AI_MODEL_NAME = "AI Soil Wetness Index"
+AI_DATA_BASIS = "public_model_precalibration"
+AI_VALIDATION_STATUS = "not_sensor_validated"
+
+_AI_CONFIDENCE_EFFECT_BY_AGREEMENT: dict[AgreementStatus, str] = {
+    AgreementStatus.AGREE: "agree_bonus",
+    AgreementStatus.PARTIAL: "none",
+    AgreementStatus.DISAGREE: "disagree_penalty",
+    AgreementStatus.UNAVAILABLE: "none",
+}
 
 
 def _to_message_codes(messages: list[Message]) -> list[MessageCode]:
@@ -116,6 +138,50 @@ def _field_summary(field: Field) -> FieldSummary:
         root_depth_override_m=field.root_depth_override,
         field_capacity_override=field.field_capacity_override,
         wilting_point_override=field.wilting_point_override,
+    )
+
+
+def _ai_summary_schema(
+    ai_result: AIInferenceResult, agreement: AgreementResult, confidence_effect: str
+) -> AISummarySchema:
+    return AISummarySchema(
+        model_name=AI_MODEL_NAME,
+        model_version=ai_result.model_version,
+        status=ai_result.status,
+        wetness_index=ai_result.wetness_index,
+        wetness_category=ai_result.wetness_category,
+        agreement_with_fao=agreement.status.value,
+        agreement_reason_code=agreement.reason_code,
+        confidence_effect=confidence_effect,
+        data_basis=AI_DATA_BASIS,
+        validation_status=AI_VALIDATION_STATUS,
+        feature_timestamp=ai_result.feature_timestamp,
+        reasons=ai_result.reasons,
+        warnings=ai_result.warnings,
+        limitations=ai_result.limitations,
+    )
+
+
+def _unavailable_ai_summary_schema() -> AISummarySchema:
+    """For Analysis rows persisted before the ai_summary column existed
+    (app/db/models/analysis.py `ai_summary` is nullable for exactly this
+    reason) — never recomputed with a newer AI model when viewed later, per
+    CLAUDE.md / PHASE 2 section 11."""
+    return AISummarySchema(
+        model_name=AI_MODEL_NAME,
+        model_version="unknown",
+        status="unavailable",
+        wetness_index=None,
+        wetness_category=None,
+        agreement_with_fao=AgreementStatus.UNAVAILABLE.value,
+        agreement_reason_code="not_available_at_analysis_time",
+        confidence_effect="none",
+        data_basis=AI_DATA_BASIS,
+        validation_status=AI_VALIDATION_STATUS,
+        feature_timestamp=None,
+        reasons=[],
+        warnings=[],
+        limitations=[],
     )
 
 
@@ -188,6 +254,11 @@ def _response_from_orm(analysis: Analysis) -> AnalysisResponse:
         water_balance_summary=water_balance_summary,
         recommendation=RecommendationSchema.model_validate(analysis.recommendation),
         confidence=ConfidenceSchema.model_validate(analysis.confidence),
+        ai_summary=(
+            AISummarySchema.model_validate(analysis.ai_summary)
+            if analysis.ai_summary
+            else _unavailable_ai_summary_schema()
+        ),
         warnings=analysis.warnings or [],
     )
 
@@ -269,6 +340,34 @@ def analyze_field(
     )
     weather_by_date = {d.date: d for d in weather_series.days}
     weather_available_dates_past = [d for d in weather_by_date if d <= analysis_date]
+
+    # AI Soil Wetness Index evidence layer (Phase 2) — an additional,
+    # non-controlling signal alongside the deterministic FAO-56 baseline
+    # below (CLAUDE.md / PHASE 2 section 5). Built from weather data already
+    # fetched above (no extra external calls); only looks up dates <=
+    # analysis_date (see run_ai_inference), so it can never see future
+    # weather. run_ai_inference is designed to never raise, but this
+    # analysis must survive even an unexpected failure inside it — the
+    # deterministic FAO-56 analysis below must always be able to complete.
+    try:
+        ai_result = run_ai_inference(
+            analysis_date=analysis_date,
+            latitude=field.centroid_latitude,
+            longitude=field.centroid_longitude,
+            weather_by_date=weather_by_date,
+            dry_max=config.ai_evidence.wetness_categories.dry_max,
+            moderate_max=config.ai_evidence.wetness_categories.moderate_max,
+        )
+    except Exception:
+        logger.exception("Unexpected AI wetness inference failure outside its own error handling")
+        ai_result = AIInferenceResult(
+            status="unavailable",
+            model_version="unknown",
+            wetness_index=None,
+            wetness_category=None,
+            feature_timestamp=None,
+            unavailable_reason_code="unexpected_error",
+        )
 
     if weather_series.coverage and weather_series.coverage.missing_dates:
         past_missing = [d for d in weather_series.coverage.missing_dates if d <= analysis_date]
@@ -477,6 +576,40 @@ def analyze_field(
     )
     all_warnings.extend(recommendation_result.warnings)
 
+    # AI-FAO agreement + capped confidence adjustment (Phase 2). Computed
+    # from the SAME adjusted_depletion/raw_mm_now already used above for
+    # recommendation_result — never a second, competing depletion figure.
+    # CRITICAL (CLAUDE.md / PHASE 2 section 5): recommendation_result was
+    # already fully computed above using the pre-adjustment
+    # confidence_result.category, so nothing from the AI evidence layer can
+    # ever influence recommended_min_mm/max_mm, the irrigation window, TAW,
+    # RAW, or depletion — only the CONFIDENCE this analysis reports below.
+    depletion_raw_ratio = (
+        adjusted_depletion / raw_mm_now
+        if adjusted_depletion is not None and raw_mm_now > 0
+        else None
+    )
+    fao_signal = fao_dryness_signal_from_ratio(
+        depletion_raw_ratio,
+        monitor_threshold=rec_defaults.status_thresholds.monitor_depletion_raw_ratio,
+        irrigate_soon_threshold=rec_defaults.status_thresholds.irrigate_soon_depletion_raw_ratio,
+    )
+    agreement_result = determine_agreement(
+        fao_signal=fao_signal,
+        ai_status=ai_result.status,
+        ai_wetness_category=ai_result.wetness_category,
+    )
+    confidence_effect = _AI_CONFIDENCE_EFFECT_BY_AGREEMENT[agreement_result.status]
+    final_confidence_result = apply_ai_agreement_adjustment(
+        confidence_result,
+        agreement_status=agreement_result.status.value,
+        agree_bonus=config.ai_evidence.confidence_adjustment.agree_bonus,
+        disagree_penalty=config.ai_evidence.confidence_adjustment.disagree_penalty,
+        high_threshold=config.confidence_weights.thresholds.high,
+        medium_threshold=config.confidence_weights.thresholds.medium,
+    )
+    ai_summary_schema = _ai_summary_schema(ai_result, agreement_result, confidence_effect)
+
     field_summary_schema = _field_summary(field)
     crop_stage_schema = CropStageSummary(
         days_after_planting=crop_stage_result.days_after_planting,
@@ -566,13 +699,13 @@ def analyze_field(
         warning_codes=_to_message_codes(recommendation_result.warning_codes),
     )
     confidence_schema = ConfidenceSchema(
-        score=confidence_result.score,
-        category=confidence_result.category,
-        factor_scores=confidence_result.factor_scores.as_dict(),
-        weights=confidence_result.weights,
-        triggered_caps=confidence_result.triggered_caps,
-        strong_factors=confidence_result.strong_factors,
-        weak_factors=confidence_result.weak_factors,
+        score=final_confidence_result.score,
+        category=final_confidence_result.category,
+        factor_scores=final_confidence_result.factor_scores.as_dict(),
+        weights=final_confidence_result.weights,
+        triggered_caps=final_confidence_result.triggered_caps,
+        strong_factors=final_confidence_result.strong_factors,
+        weak_factors=final_confidence_result.weak_factors,
     )
 
     # Deduplicate warnings while preserving order.
@@ -600,6 +733,7 @@ def analyze_field(
         },
         recommendation=recommendation_schema.model_dump(mode="json"),
         confidence=confidence_schema.model_dump(mode="json"),
+        ai_summary=ai_summary_schema.model_dump(mode="json"),
         warnings=deduped_warnings,
         calculation_version=ANALYSIS_METHODOLOGY_VERSION,
     )
@@ -621,5 +755,6 @@ def analyze_field(
         water_balance_summary=water_balance_summary_schema,
         recommendation=recommendation_schema,
         confidence=confidence_schema,
+        ai_summary=ai_summary_schema,
         warnings=deduped_warnings,
     )

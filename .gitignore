@@ -18,6 +18,10 @@ venv/
 build/
 dist/
 
+# --- AI bootstrap dataset cache (local-only raw Open-Meteo responses used
+# to avoid repeated network calls while iterating; never committed) ---
+backend/.ai_dataset_cache/
+
 # --- Databases ---
 *.db
 *.sqlite

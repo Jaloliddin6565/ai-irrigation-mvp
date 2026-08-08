@@ -1,8 +1,11 @@
 import { useTranslation } from "react-i18next";
 
+import { AiSummaryCard } from "../../components/analysis/AiSummaryCard";
 import { ConfidenceCard } from "../../components/analysis/ConfidenceCard";
 import { DataSourcePanel } from "../../components/analysis/DataSourcePanel";
+import { DataSourcesSummaryCard } from "../../components/analysis/DataSourcesSummaryCard";
 import { RecommendationCard } from "../../components/analysis/RecommendationCard";
+import { WhyCard } from "../../components/analysis/WhyCard";
 import { CollapsibleSection } from "../../components/disclosure/CollapsibleSection";
 import { SatelliteChart } from "../../components/charts/SatelliteChart";
 import { WaterBalanceChart } from "../../components/charts/WaterBalanceChart";
@@ -15,14 +18,17 @@ import { initializationMethodKey, messageCodeKey } from "../../utils/labels";
 import type { AnalysisResponse } from "../../types/api";
 
 /**
- * Two-level result view: RecommendationCard + ConfidenceCard + the facts
- * strip below are the primary farmer-facing view (status, window,
- * actionable amount, short reason, confidence, latest satellite date,
- * rain forecast). Everything else — the full daily water balance, all six
- * satellite indices, provenance metadata, and raw technical
- * warning/reason text — lives in collapsed expert sections below, still
- * fully reachable, never the primary content (see CLAUDE.md rule 4 and
- * docs/methodology.md).
+ * Farmer-facing hierarchy (Phase 3 Award MVP):
+ * 1. RecommendationCard — the authoritative FAO-56 recommendation, unchanged.
+ * 2. AiSummaryCard — AI Soil Wetness Index evidence layer (non-controlling;
+ *    never alters the recommendation above — see CLAUDE.md / PHASE 2 section 5).
+ * 3. WhyCard — short plain-Uzbek synthesis ("Nega?").
+ * 4. DataSourcesSummaryCard — plain "which sources fed this" summary.
+ * 5. ConfidenceCard + the facts strip below — existing primary content, unchanged.
+ * Everything else — the full daily water balance, all six satellite
+ * indices, provenance metadata, and raw technical warning/reason text —
+ * lives in collapsed expert sections below, still fully reachable, never
+ * the primary content (see CLAUDE.md rule 4 and docs/methodology.md).
  */
 export function AnalysisResultView({ analysis }: { analysis: AnalysisResponse }) {
   const { t } = useTranslation();
@@ -36,6 +42,16 @@ export function AnalysisResultView({ analysis }: { analysis: AnalysisResponse })
         methodologyVersion={analysis.methodology_version}
         analysisDate={analysis.analysis_date}
       />
+
+      <AiSummaryCard aiSummary={analysis.ai_summary} confidenceCategory={analysis.confidence.category} />
+
+      <WhyCard
+        recommendation={analysis.recommendation}
+        aiSummary={analysis.ai_summary}
+        weatherSummary={analysis.weather_summary}
+      />
+
+      <DataSourcesSummaryCard fieldSummary={analysis.field_summary} />
 
       <ConfidenceCard confidence={analysis.confidence} />
 

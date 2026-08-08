@@ -189,6 +189,33 @@ class ConfidenceSchema(BaseModel):
     weak_factors: list[str] = Field(default_factory=list)
 
 
+class AISummarySchema(BaseModel):
+    """AI Soil Wetness Index evidence layer (Phase 2) — additive only.
+    Never claims measurement (CLAUDE.md rule 3): wetness_index is a
+    location-relative, pre-calibration proxy, not a soil-moisture reading,
+    and nothing here alters recommended_min_mm/max_mm, the irrigation
+    window, TAW, RAW, or FAO depletion — see app/domain/ai_agreement.py and
+    PHASE 2 section 5. Clients that ignore this field see no behavior
+    change."""
+
+    model_config = ConfigDict(frozen=True)
+
+    model_name: str
+    model_version: str
+    status: str  # "available" | "unavailable"
+    wetness_index: float | None
+    wetness_category: str | None  # "dry" | "moderate" | "wet" | None
+    agreement_with_fao: str  # "agree" | "partial" | "disagree" | "unavailable"
+    agreement_reason_code: str
+    confidence_effect: str  # "agree_bonus" | "disagree_penalty" | "none"
+    data_basis: str
+    validation_status: str
+    feature_timestamp: date | None
+    reasons: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
 class AnalysisResponse(BaseModel):
     id: int
     field_id: int
@@ -203,6 +230,7 @@ class AnalysisResponse(BaseModel):
     water_balance_summary: WaterBalanceSummary
     recommendation: RecommendationSchema
     confidence: ConfidenceSchema
+    ai_summary: AISummarySchema
     warnings: list[str] = Field(default_factory=list)
     disclaimer_uz: str = DISCLAIMER_UZ
 

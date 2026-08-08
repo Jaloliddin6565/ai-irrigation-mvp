@@ -1,0 +1,124 @@
+# Bootstrap sampling locations for the AI Soil Moisture Proxy v0.1 training
+# dataset (backend/scripts/train_ai_soil_moisture.py).
+#
+# These are representative bootstrap coordinates used to create an open-data
+# pre-calibration dataset. They are NOT field sensor observations and were
+# NOT selected by any farmer-reported ground truth — they are approximate
+# population centres of well-known agricultural districts, picked to spread
+# coverage across Uzbekistan's climate/soil diversity (irrigated lowland
+# cotton/wheat belt, Fergana valley, arid south, delta/desert-fringe west).
+#
+# `split` assigns each location to model TRAIN or held-out TEST use before
+# any data is collected or any model is trained (CLAUDE.md rule 1: no
+# randomness in this pipeline's decisions). Test locations are never seen
+# during training, so reported metrics measure generalization to a new
+# location, not memorization of a training location's seasonal pattern —
+# see docs/methodology.md-style rationale in
+# backend/scripts/train_ai_soil_moisture.py.
+methodology_version: "0.1.0"
+
+locations:
+  - id: tashkent_chinoz
+    region_uz: "Toshkent viloyati"
+    label_uz: "Chinoz tumani atrofi"
+    latitude: 40.90
+    longitude: 69.20
+    split: train
+
+  - id: sirdaryo_gulistan
+    region_uz: "Sirdaryo viloyati"
+    label_uz: "Guliston shahri atrofi"
+    latitude: 40.49
+    longitude: 68.78
+    split: train
+
+  - id: jizzax_city
+    region_uz: "Jizzax viloyati"
+    label_uz: "Jizzax shahri atrofi"
+    latitude: 40.12
+    longitude: 67.84
+    split: test
+
+  - id: samarkand_city
+    region_uz: "Samarqand viloyati"
+    label_uz: "Samarqand shahri atrofi"
+    latitude: 39.65
+    longitude: 66.98
+    split: train
+
+  - id: samarkand_kattakurgan
+    region_uz: "Samarqand viloyati"
+    label_uz: "Kattaqo'rg'on tumani atrofi"
+    latitude: 39.90
+    longitude: 66.25
+    split: train
+
+  - id: fergana_city
+    region_uz: "Farg'ona viloyati"
+    label_uz: "Farg'ona shahri atrofi"
+    latitude: 40.38
+    longitude: 71.78
+    split: train
+
+  - id: fergana_kokand
+    region_uz: "Farg'ona viloyati"
+    label_uz: "Qo'qon shahri atrofi"
+    latitude: 40.53
+    longitude: 70.94
+    split: test
+
+  - id: andijon_city
+    region_uz: "Andijon viloyati"
+    label_uz: "Andijon shahri atrofi"
+    latitude: 40.78
+    longitude: 72.34
+    split: train
+
+  - id: namangan_city
+    region_uz: "Namangan viloyati"
+    label_uz: "Namangan shahri atrofi"
+    latitude: 41.00
+    longitude: 71.67
+    split: train
+
+  - id: kashkadarya_qarshi
+    region_uz: "Qashqadaryo viloyati"
+    label_uz: "Qarshi shahri atrofi"
+    latitude: 38.86
+    longitude: 65.80
+    split: train
+
+  - id: surkhandarya_termiz
+    region_uz: "Surxondaryo viloyati"
+    label_uz: "Termiz shahri atrofi"
+    latitude: 37.62
+    longitude: 67.28
+    split: test
+
+  - id: bukhara_city
+    region_uz: "Buxoro viloyati"
+    label_uz: "Buxoro shahri atrofi"
+    latitude: 39.77
+    longitude: 64.42
+    split: train
+
+  - id: bukhara_gijduvon
+    region_uz: "Buxoro viloyati"
+    label_uz: "G'ijduvon tumani atrofi"
+    latitude: 40.10
+    longitude: 64.68
+    split: train
+
+  - id: khorezm_urganch
+    region_uz: "Xorazm viloyati"
+    label_uz: "Urganch shahri atrofi"
+    latitude: 41.55
+    longitude: 60.63
+    split: train
+
+  - id: karakalpakstan_nukus
+    region_uz: "Qoraqalpog'iston Respublikasi"
+    label_uz: "Nukus shahri atrofi"
+    latitude: 42.46
+    longitude: 59.61
+    split: test

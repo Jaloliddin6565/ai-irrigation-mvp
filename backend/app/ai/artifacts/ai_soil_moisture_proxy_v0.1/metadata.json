@@ -1,0 +1,67 @@
+{
+  "model_version": "ai_soil_moisture_proxy_v0.1",
+  "trained_at": "2025-12-31",
+  "feature_list": [
+    "et0_mm",
+    "precipitation_mm",
+    "temperature_max_c",
+    "temperature_min_c",
+    "temperature_mean_c",
+    "relative_humidity_mean_pct",
+    "vpd_kpa",
+    "wind_speed_ms",
+    "shortwave_radiation_mj_m2",
+    "day_of_year",
+    "month",
+    "latitude",
+    "longitude"
+  ],
+  "target_definition": "Depth-weighted blend of Open-Meteo's modelled hourly soil_moisture_7_to_28cm and soil_moisture_28_to_100cm layers (weights 19/72 and 53/72, approximating a 9-81cm root zone), aggregated to a daily mean. A public reanalysis-derived weak label, not a sensor measurement.",
+  "training_samples": 4015,
+  "train_test_split": {
+    "method": "location_group_holdout",
+    "description": "Locations were assigned to train/test before any data was collected (backend/config/ai_bootstrap_locations.yaml `split` field). No day from a test location appears in training, so metrics measure generalization to an unseen location rather than interpolation between nearby days at the same location.",
+    "train_location_ids": [
+      "tashkent_chinoz",
+      "sirdaryo_gulistan",
+      "samarkand_city",
+      "samarkand_kattakurgan",
+      "fergana_city",
+      "andijon_city",
+      "namangan_city",
+      "kashkadarya_qarshi",
+      "bukhara_city",
+      "bukhara_gijduvon",
+      "khorezm_urganch"
+    ],
+    "test_location_ids": [
+      "jizzax_city",
+      "fergana_kokand",
+      "surkhandarya_termiz",
+      "karakalpakstan_nukus"
+    ]
+  },
+  "metrics": {
+    "rmse": 0.0760528758642915,
+    "mae": 0.06469215543078385,
+    "r2": -0.13533644998196914,
+    "note": "Performance against PUBLIC MODELLED SOIL-MOISTURE WEAK LABELS (Open-Meteo reanalysis-derived root-zone proxy), evaluated only on held-out test locations. This is NOT accuracy against real soil sensors — no in-situ Uzbekistan ground truth exists yet."
+  },
+  "weak_label_source": "Open-Meteo Archive API (ERA5-Land reanalysis-derived hourly soil moisture), 2025-01-01 to 2025-12-31, 15 bootstrap Uzbekistan locations (backend/config/ai_bootstrap_locations.yaml).",
+  "xgboost_version": "3.4.0",
+  "hyperparameters": {
+    "n_estimators": 200,
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "objective": "reg:squarederror",
+    "random_state": 42
+  },
+  "limitations": [
+    "This model estimates a MODELLED root-zone soil-moisture PROXY derived from public reanalysis data; it does not measure actual field soil moisture and has not been validated against any in-situ sensor.",
+    "Training data covers a bootstrap set of ~15 representative Uzbekistan locations and one historical period; it has not been validated across multiple years, crop types, or irrigation practices.",
+    "The weak-label target itself is a model output (Open-Meteo/ERA5-Land derived), not ground truth, so this model can only ever be as accurate as that upstream reanalysis product.",
+    "Not yet used to alter any irrigation recommendation or water-balance calculation (Phase 1 only) — see CLAUDE.md."
+  ]
+}

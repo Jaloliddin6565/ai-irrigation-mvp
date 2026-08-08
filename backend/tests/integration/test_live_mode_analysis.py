@@ -110,6 +110,8 @@ def _weather_side_effect(request: httpx.Request) -> httpx.Response:
             "precipitation_sum": [0.0] * n,
             "temperature_2m_max": [30.0] * n,
             "temperature_2m_min": [15.0] * n,
+            "temperature_2m_mean": [22.0] * n,
+            "relative_humidity_2m_mean": [50.0] * n,
             "wind_speed_10m_max": [2.0] * n,
             "shortwave_radiation_sum": [20.0] * n,
         }

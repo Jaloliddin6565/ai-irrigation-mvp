@@ -2,6 +2,7 @@
 // place means a new enum value fails loudly (falls back to the raw string)
 // instead of silently mis-labeling.
 import type {
+  AgreementWithFao,
   ConfidenceCategory,
   CropGrowthStage,
   InitializationMethod,
@@ -11,6 +12,7 @@ import type {
   SatelliteQualityStatus,
   ValueSource,
   WeatherCompletenessStatus,
+  WetnessCategory,
 } from "../types/api";
 
 export function recommendationStatusKey(status: RecommendationStatus): string {
@@ -67,4 +69,27 @@ export function triggeredCapKey(capName: string): string {
 // MessageCode.params via react-i18next's {{param}} syntax.
 export function messageCodeKey(code: string): string {
   return `messages.${code}`;
+}
+
+// AI Soil Wetness Index evidence layer (Phase 3) — same "raw backend string
+// -> dotted i18n key" discipline as every mapper above, never inline string
+// matching in a component.
+export function aiWetnessCategoryKey(category: WetnessCategory): string {
+  return `aiSummary.wetnessCategory.${category}`;
+}
+
+export function aiAgreementKey(agreement: AgreementWithFao): string {
+  return `aiSummary.agreement.${agreement}`;
+}
+
+// data_basis/validation_status are currently fixed single constants on the
+// backend (see app/services/analysis.py AI_DATA_BASIS/AI_VALIDATION_STATUS),
+// but are still mapped through i18n rather than hardcoded so a future
+// second value fails loudly instead of silently falling back to English.
+export function aiDataBasisKey(dataBasis: string): string {
+  return `aiSummary.dataBasis.${dataBasis}`;
+}
+
+export function aiValidationStatusKey(validationStatus: string): string {
+  return `aiSummary.validationStatus.${validationStatus}`;
 }
