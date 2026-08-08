@@ -334,6 +334,36 @@ export interface ConfidenceSchema {
   weak_factors: string[];
 }
 
+// --- AI Soil Wetness Index evidence layer (Phase 2/3) ----------------------
+// Mirrors backend/app/schemas/analysis.py AISummarySchema field-for-field.
+// wetness_index is a LOCATION-RELATIVE 0-1 proxy, never volumetric soil
+// moisture — never render it as "% soil moisture" (CLAUDE.md rule 3).
+
+export type AIAvailabilityStatus = "available" | "unavailable";
+
+export type WetnessCategory = "dry" | "moderate" | "wet";
+
+export type AgreementWithFao = "agree" | "partial" | "disagree" | "unavailable";
+
+export type AIConfidenceEffect = "agree_bonus" | "disagree_penalty" | "none";
+
+export interface AISummary {
+  model_name: string;
+  model_version: string;
+  status: AIAvailabilityStatus;
+  wetness_index: number | null;
+  wetness_category: WetnessCategory | null;
+  agreement_with_fao: AgreementWithFao;
+  agreement_reason_code: string;
+  confidence_effect: AIConfidenceEffect;
+  data_basis: string;
+  validation_status: string;
+  feature_timestamp: string | null;
+  reasons: string[];
+  warnings: string[];
+  limitations: string[];
+}
+
 export interface AnalysisResponse {
   id: number;
   field_id: number;
@@ -348,6 +378,7 @@ export interface AnalysisResponse {
   water_balance_summary: WaterBalanceSummary;
   recommendation: RecommendationSchema;
   confidence: ConfidenceSchema;
+  ai_summary: AISummary;
   warnings: string[];
   disclaimer_uz: string;
 }
